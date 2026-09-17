@@ -21,6 +21,12 @@ class AppRepository(private val context: Context, private val store: AppStore = 
             SortMode.INSTALL -> result.sortedWith(compareByDescending<AppEntry> { it.installTime }.thenBy { it.label.lowercase() })
             SortMode.RECENT -> result.sortedWith(compareByDescending<AppEntry> { it.lastUsed }.thenBy { it.label.lowercase() })
         }
-        return store.applyManualOrder(sorted)
+        val ordered = store.applyManualOrder(sorted).toMutableList()
+        val active = store.activePackage()
+        if (store.sortMode() == SortMode.RECENT && active != null) {
+            val activeEntry = ordered.firstOrNull { it.packageName == active }
+            if (activeEntry != null) { ordered.remove(activeEntry); ordered.add(activeEntry) }
+        }
+        return ordered
     }
 }

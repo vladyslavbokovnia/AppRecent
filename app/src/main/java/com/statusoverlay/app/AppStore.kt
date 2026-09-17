@@ -20,6 +20,10 @@ class AppStore(context: Context) {
     fun setSortMode(mode: SortMode) = prefs.edit().putString("sort_mode", mode.name).apply()
     fun invertScroll(): Boolean = prefs.getBoolean("invert_scroll", false)
     fun setInvertScroll(value: Boolean) = prefs.edit().putBoolean("invert_scroll", value).apply()
+    fun iconSize(): Int = prefs.getInt("icon_size", 68)
+    fun setIconSize(value: Int) = prefs.edit().putInt("icon_size", value.coerceIn(48, 92)).apply()
+    fun activePackage(): String? = prefs.getString("active_package", null)
+    fun setActivePackage(packageName: String) = prefs.edit().putString("active_package", packageName).apply()
     fun overrides(): List<String> = prefs.getString("order_overrides", "")!!.split('|').filter(String::isNotBlank)
     fun setOverrides(order: List<String>) = prefs.edit().putString("order_overrides", order.distinct().joinToString("|")).apply()
 

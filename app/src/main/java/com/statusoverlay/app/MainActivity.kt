@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.getValue
@@ -51,7 +52,7 @@ class MainActivity : ComponentActivity() {
     private fun open(action: String, data: Uri? = null) { startActivity(Intent(action).apply { data?.let(::setData) }) }
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable private fun SettingsScreen() {
-        var render by remember { mutableStateOf(store.renderMode()) }; var sort by remember { mutableStateOf(store.sortMode()) }; var invert by remember { mutableStateOf(store.invertScroll()) }
+        var render by remember { mutableStateOf(store.renderMode()) }; var sort by remember { mutableStateOf(store.sortMode()) }; var invert by remember { mutableStateOf(store.invertScroll()) }; var iconSize by remember { mutableStateOf(store.iconSize().toFloat()) }
         MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF10131A), surface = Color(0xFF191E28), primary = Color(0xFF9DB7FF))) {
             Scaffold(topBar = { TopAppBar(title = { Text("AppRecent") }, navigationIcon = { androidx.compose.material3.Icon(Icons.Default.Settings, "Настройки") }) }) { pad ->
                 Column(Modifier.fillMaxSize().padding(pad).padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -66,6 +67,11 @@ class MainActivity : ComponentActivity() {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Инвертировать прокрутку по краю"); Switch(checked = invert, onCheckedChange = { invert = it; store.setInvertScroll(it) }) }
                     } }
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Порядок приложений", style = MaterialTheme.typography.titleMedium); Choice(Icons.Default.SwapHoriz, "Недавние — активное приложение в конце", sort == SortMode.RECENT) { sort = SortMode.RECENT; store.setSortMode(sort) }; Choice(Icons.Default.Settings, "По дате установки", sort == SortMode.INSTALL) { sort = SortMode.INSTALL; store.setSortMode(sort) } } }
+                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Choice(Icons.Default.Settings, "Размер иконок: ${iconSize.toInt()} dp", false) { }
+                        Slider(value = iconSize, onValueChange = { iconSize = it; store.setIconSize(it.toInt()) }, valueRange = 48f..92f, steps = 10)
+                        Text("Изменение применяется к панели после обновления списка.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } }
                     Button(onClick = { open(Settings.ACTION_ACCESSIBILITY_SETTINGS) }, modifier = Modifier.fillMaxWidth()) { Text("Запустить / настроить панель") }
                     Spacer(Modifier.height(24.dp))
                 }

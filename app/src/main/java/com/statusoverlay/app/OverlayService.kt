@@ -15,6 +15,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
+import android.widget.TextView
 import android.widget.Toast
 import android.os.Handler
 import android.os.Looper
@@ -31,6 +32,7 @@ class OverlayService : AccessibilityService() {
     private var active = false
     private var page = 0
     private var pageCount = 1
+    private var pageIndicator: TextView? = null
 
     private val refreshTask = object : Runnable {
         override fun run() { if (active) { refreshList(false); handler.postDelayed(this, 4000L) } }
@@ -52,7 +54,15 @@ class OverlayService : AccessibilityService() {
         }
     }
 
-    override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {
+        val packageName = event?.packageName?.toString() ?: return
+        if (packageName == packageNameOfSelf()) return
+        if (event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            store.setActivePackage(packageName)
+            handler.removeCallbacks(refreshFromEvent)
+            handler.postDelayed(refreshFromEvent, 80L)
+        }
+    }
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
@@ -77,6 +87,9 @@ class OverlayService : AccessibilityService() {
         panel.addView(horizontal, LinearLayout.LayoutParams(0, dp(68), 1f))
         val next = iconButton(android.R.drawable.ic_media_next, "Следующая страница") { page = (page + 1).coerceAtMost(pageCount - 1); refreshList(true) }
         panel.addView(next, LinearLayout.LayoutParams(dp(40), dp(68)))
+        val indicator = TextView(this).apply { setTextColor(Color.LTGRAY); textSize = 11f; gravity = Gravity.CENTER; contentDescription = "Индикатор страницы" }
+        pageIndicator = indicator
+        panel.addView(indicator, LinearLayout.LayoutParams(dp(34), dp(68)))
         root = panel; scroll = horizontal; content = items
         val params = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(76), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP; y = dp(20) }
         windowManager.addView(panel, params)
@@ -92,8 +105,10 @@ class OverlayService : AccessibilityService() {
         pageCount = if (paged) ((entries.size + pageSize - 1) / pageSize).coerceAtLeast(1) else 1
         page = page.coerceIn(0, pageCount - 1)
         val display = if (paged) entries.drop(page * pageSize).take(pageSize) else entries
-        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(68), dp(68))) }
-        if (scrollToEnd && !paged) scroll?.post { scroll?.fullScroll(HorizontalScrollView.FOCUS_RIGHT) }
+        val iconSize = store.iconSize()
+        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), dp(iconSize))) }
+        pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
+        if (scrollToEnd && !paged) scroll?.post { scroll?.smoothScrollTo(scroll?.getChildAt(0)?.width ?: 0, 0) }
     }
 
     private fun createAppView(entry: AppEntry): View = ImageView(this).apply {
@@ -131,4 +146,6 @@ class OverlayService : AccessibilityService() {
         if (custom == null) packageManager.getApplicationIcon(packageName) else contentResolver.openInputStream(Uri.parse(custom)).use { Drawable.createFromStream(it, custom) }
     }.getOrNull()
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
+    private val refreshFromEvent = Runnable { page = 0; refreshList(true) }
+    private fun packageNameOfSelf(): String = applicationContext.packageName
 }
