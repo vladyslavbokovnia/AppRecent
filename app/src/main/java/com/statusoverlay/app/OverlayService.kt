@@ -37,6 +37,7 @@ class OverlayService : AccessibilityService() {
     private var page = 0
     private var pageCount = 1
     private var pageIndicator: TextView? = null
+    private var overlayHeightPx = 128
     private var batteryBar: View? = null
     private var edgeHandle: View? = null
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -96,6 +97,8 @@ class OverlayService : AccessibilityService() {
     }
 
     private fun createOverlay() {
+        val overlayHeight = statusBarHeightPx()
+        overlayHeightPx = overlayHeight
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -111,19 +114,24 @@ class OverlayService : AccessibilityService() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        horizontal.addView(items, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(128)))
-        panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(128)))
+        horizontal.addView(items, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, overlayHeight))
+        panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, overlayHeight))
         root = panel
         scroll = horizontal
         content = items
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            dp(128),
+            overlayHeight,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             android.graphics.PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP }
         windowManager.addView(panel, params)
+    }
+
+    private fun statusBarHeightPx(): Int {
+        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (id != 0) resources.getDimensionPixelSize(id) * 2 else dp(48)
     }
 
     private fun createBatteryOverlay() {
@@ -163,7 +171,7 @@ class OverlayService : AccessibilityService() {
         page = page.coerceIn(0, pageCount - 1)
         val display = if (paged) entries.drop(page * pageSize).take(pageSize) else entries
         val iconSize = store.iconSize()
-        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), dp(128)).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
+        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
         pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
         if (scrollToEnd && !paged) scroll?.post {
             val destination = scroll?.getChildAt(0)?.width ?: 0
@@ -174,7 +182,7 @@ class OverlayService : AccessibilityService() {
     private fun createAppView(entry: AppEntry): View = ImageView(this).apply {
         val custom = store.customIcon(entry.packageName)
         scaleType = if (custom == null) ImageView.ScaleType.CENTER_CROP else ImageView.ScaleType.FIT_CENTER
-        if (custom == null) setPadding(dp((store.iconSize() * 0.05f).toInt()), dp((128 * 0.10f).toInt()), dp((store.iconSize() * 0.05f).toInt()), dp((128 * 0.10f).toInt())) else setPadding(0, 0, 0, 0)
+        if (custom == null) setPadding(dp((store.iconSize() * 0.05f).toInt()), (overlayHeightPx * 0.10f).toInt(), dp((store.iconSize() * 0.05f).toInt()), (overlayHeightPx * 0.10f).toInt()) else setPadding(0, 0, 0, 0)
         contentDescription = entry.label
         background = ColorDrawable(Color.TRANSPARENT); setImageDrawable(loadIcon(entry.packageName))
         setOnClickListener { launch(entry) }; setOnLongClickListener { showMenu(this, entry); true }
