@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="#ff1a1a2e" android:padding="16.0dip" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="22.0sp" android:textStyle="bold" android:textColor="#ffffffff" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="16.0dip" android:text="AppRecent" />
+    <TextView android:textColor="#ffffffff" android:id="@id/tvOverlayStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="8.0dip" android:text="● Наложение поверх: ПРОВЕРКА" />
+    <Button android:id="@id/btnGrantOverlay" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginBottom="8.0dip" android:text="Разрешить наложение" android:backgroundTint="#ff0f3460" />
+    <TextView android:textColor="#ffffffff" android:id="@id/tvUsageStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="8.0dip" android:text="● Статистика: ПРОВЕРКА" />
+    <Button android:id="@id/btnGrantUsage" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginBottom="16.0dip" android:text="Разрешить статистику" android:backgroundTint="#ff0f3460" />
+    <Button android:id="@id/btnToggleOverlay" android:layout_width="fill_parent" android:layout_height="56.0dip" android:layout_marginBottom="16.0dip" android:text="Включить Спец. возможности" android:backgroundTint="#ffe94560" />
+    <CheckBox android:textColor="#ffffffff" android:id="@id/cbInvertScroll" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="16.0dip" android:text="Инвертировать прокрутку по краю" />
+    <TextView android:textSize="14.0sp" android:textColor="#ffaaaacc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="8.0dip" android:text="Скрытые приложения (нажмите, чтобы вернуть):" />
+    <ListView android:id="@id/lvHiddenApps" android:layout_width="fill_parent" android:layout_height="0.0dip" android:divider="#22ffffff" android:dividerHeight="1.0dip" android:layout_weight="1.0" />
+</LinearLayout>

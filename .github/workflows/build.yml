@@ -1,0 +1,21 @@
+name: Build AppRecent APK
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install apktool
+        run: sudo apt-get update && sudo apt-get install -y apktool
+      - name: Verify reconstructed patches
+        run: ./scripts/apply_patches.sh
+      - name: Build APK
+        run: apktool b . -o AppRecent-debug-unsigned.apk
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AppRecent-debug-unsigned
+          path: AppRecent-debug-unsigned.apk
