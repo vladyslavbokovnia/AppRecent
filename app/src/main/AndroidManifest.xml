@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <application android:theme="@style/Theme.AppRecent" android:label="AppRecent" android:allowBackup="false" android:supportsRtl="true">
+    <application android:theme="@style/Theme.AppRecent" android:label="AppRecent" android:icon="@drawable/ic_app_recent" android:roundIcon="@drawable/ic_app_recent" android:allowBackup="false" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>

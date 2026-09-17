@@ -20,7 +20,9 @@ jobs:
           gradle-version: '8.9'
       - name: Build and test
         run: gradle :app:assembleDebug :app:testDebugUnitTest --stacktrace
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/AppRecent-2.0-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: AppRecent-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: AppRecent-2.0-debug
+          path: app/build/outputs/apk/debug/AppRecent-2.0-debug.apk

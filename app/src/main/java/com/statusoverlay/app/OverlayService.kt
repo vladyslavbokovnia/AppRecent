@@ -35,7 +35,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,9 +44,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import android.widget.ImageView
-import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.setViewTreeLifecycleOwner
 import kotlinx.coroutines.delay
 
 class OverlayService : AccessibilityService() {
@@ -58,14 +59,15 @@ class OverlayService : AccessibilityService() {
     private var visible by mutableStateOf(true)
     private var entries by mutableStateOf(emptyList<AppEntry>())
     private var refreshTick by mutableIntStateOf(0)
+    private lateinit var composeLifecycleOwner: ServiceLifecycleOwner
 
-    override fun onServiceConnected() { super.onServiceConnected(); windowManager = getSystemService(WINDOW_SERVICE) as WindowManager; store = AppStore(this); repository = AppRepository(this, store); refresh(); createOverlay() }
+    override fun onServiceConnected() { super.onServiceConnected(); windowManager = getSystemService(WINDOW_SERVICE) as WindowManager; store = AppStore(this); repository = AppRepository(this, store); composeLifecycleOwner = ServiceLifecycleOwner(); refresh(); createOverlay() }
     override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {}
     override fun onInterrupt() {}
-    override fun onDestroy() { overlay?.let { runCatching { windowManager.removeView(it) } }; overlay = null; super.onDestroy() }
+    override fun onDestroy() { if (::composeLifecycleOwner.isInitialized) composeLifecycleOwner.destroy(); overlay?.let { runCatching { windowManager.removeView(it) } }; overlay = null; super.onDestroy() }
     private fun refresh() { entries = repository.load(); refreshTick++ }
     private fun createOverlay() {
-        overlay = ComposeView(this).apply { setContent { OverlayPanel() } }
+        overlay = ComposeView(this).apply { setViewTreeLifecycleOwner(composeLifecycleOwner); setContent { OverlayPanel() } }
         val lp = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, 76.dpPx(), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP; y = 20.dpPx() }
         windowManager.addView(overlay, lp)
     }
@@ -109,4 +111,11 @@ class OverlayService : AccessibilityService() {
         AndroidView(factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(3, 3, 3, 3) } }, update = { it.setImageDrawable(drawable) }, modifier = Modifier.fillMaxSize())
     }
     private fun loadIcon(packageName: String, custom: String?): Drawable? = runCatching { if (custom != null) contentResolver.openInputStream(Uri.parse(custom)).use { android.graphics.drawable.Drawable.createFromStream(it, custom) } else packageManager.getApplicationIcon(packageName) }.getOrNull()
+
+    private class ServiceLifecycleOwner : LifecycleOwner {
+        private val registry = LifecycleRegistry(this)
+        init { registry.currentState = Lifecycle.State.RESUMED }
+        override val lifecycle: Lifecycle get() = registry
+        fun destroy() { registry.currentState = Lifecycle.State.DESTROYED }
+    }
 }
