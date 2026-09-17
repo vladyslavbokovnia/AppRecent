@@ -23,8 +23,6 @@ import android.os.Handler
 import android.os.Looper
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
-import android.content.BroadcastReceiver
-import android.content.IntentFilter
 
 class OverlayService : AccessibilityService() {
     private lateinit var windowManager: WindowManager
@@ -39,18 +37,6 @@ class OverlayService : AccessibilityService() {
     private var page = 0
     private var pageCount = 1
     private var pageIndicator: TextView? = null
-    private var batteryBar: View? = null
-    private var edgeHandle: View? = null
-    private val batteryReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: android.content.Context?, intent: Intent?) {
-            val level = intent?.getIntExtra("level", -1) ?: return
-            val scale = intent.getIntExtra("scale", -1)
-            if (level >= 0 && scale > 0) batteryBar?.let { bar ->
-                bar.layoutParams = bar.layoutParams.apply { width = (resources.displayMetrics.widthPixels * level.toFloat() / scale).toInt() }
-                bar.requestLayout()
-            }
-        }
-    }
     private var batteryBar: View? = null
     private var edgeHandle: View? = null
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -129,32 +115,6 @@ class OverlayService : AccessibilityService() {
         root = panel; scroll = horizontal; content = items
         val params = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(76), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP; y = dp(20) }
         windowManager.addView(panel, params)
-    }
-
-    private fun createBatteryOverlay() {
-        batteryBar = View(this).apply { setBackgroundColor(Color.rgb(70, 210, 130)) }
-        val lp = WindowManager.LayoutParams(0, dp(4), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.BOTTOM }
-        windowManager.addView(batteryBar, lp)
-    }
-
-    private fun createEdgeHandle() {
-        val handle = View(this).apply { setBackgroundColor(Color.TRANSPARENT) }
-        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(event: MotionEvent) = true
-            override fun onLongPress(event: MotionEvent) { toggleVisibility() }
-            override fun onScroll(first: MotionEvent?, current: MotionEvent, dx: Float, dy: Float): Boolean {
-                if (root?.visibility == View.VISIBLE) scroll?.scrollBy(if (store.invertScroll()) dy.toInt() * 2 else -dy.toInt() * 2, 0)
-                return true
-            }
-        })
-        handle.setOnTouchListener { _, event -> detector.onTouchEvent(event) }
-        edgeHandle = handle
-        val lp = WindowManager.LayoutParams(dp(18), -1, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.END }
-        windowManager.addView(handle, lp)
-    }
-
-    private fun toggleVisibility() {
-        root?.let { view -> view.visibility = if (view.visibility == View.VISIBLE) View.GONE else View.VISIBLE; if (view.visibility == View.VISIBLE) refreshList(true) }
     }
 
     private fun createBatteryOverlay() {
