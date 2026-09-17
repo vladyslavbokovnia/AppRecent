@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Порядок приложений", style = MaterialTheme.typography.titleMedium); Choice(Icons.Default.SwapHoriz, "Недавние — активное приложение в конце", sort == SortMode.RECENT) { sort = SortMode.RECENT; store.setSortMode(sort) }; Choice(Icons.Default.Settings, "По дате установки", sort == SortMode.INSTALL) { sort = SortMode.INSTALL; store.setSortMode(sort) } } }
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Choice(Icons.Default.Settings, "Размер иконок: ${iconSize.toInt()} dp", false) { }
-                        Slider(value = iconSize, onValueChange = { iconSize = it; store.setIconSize(it.toInt()) }, valueRange = 48f..92f, steps = 10)
+                        Slider(value = iconSize, onValueChange = { iconSize = it; store.setIconSize(it.toInt()) }, valueRange = 64f..220f, steps = 15)
                         Text("Изменение применяется к панели после обновления списка.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } }
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

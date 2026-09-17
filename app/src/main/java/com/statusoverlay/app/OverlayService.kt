@@ -165,11 +165,10 @@ class OverlayService : AccessibilityService() {
         entries = runCatching { repository.load() }.getOrDefault(emptyList())
         val target = content ?: return
         target.removeAllViews()
-        val pageSize = 6
-        val paged = store.renderMode() == RenderMode.PAGED
-        pageCount = if (paged) ((entries.size + pageSize - 1) / pageSize).coerceAtLeast(1) else 1
-        page = page.coerceIn(0, pageCount - 1)
-        val display = if (paged) entries.drop(page * pageSize).take(pageSize) else entries
+        val paged = false
+        pageCount = 1
+        page = 0
+        val display = entries
         val iconSize = store.iconSize()
         display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
         pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
