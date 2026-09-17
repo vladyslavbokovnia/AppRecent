@@ -8,6 +8,8 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.provider.Settings
 import android.view.Gravity
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.HorizontalScrollView
@@ -19,6 +21,10 @@ import android.widget.TextView
 import android.widget.Toast
 import android.os.Handler
 import android.os.Looper
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 
 class OverlayService : AccessibilityService() {
     private lateinit var windowManager: WindowManager
@@ -33,6 +39,30 @@ class OverlayService : AccessibilityService() {
     private var page = 0
     private var pageCount = 1
     private var pageIndicator: TextView? = null
+    private var batteryBar: View? = null
+    private var edgeHandle: View? = null
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            val level = intent?.getIntExtra("level", -1) ?: return
+            val scale = intent.getIntExtra("scale", -1)
+            if (level >= 0 && scale > 0) batteryBar?.let { bar ->
+                bar.layoutParams = bar.layoutParams.apply { width = (resources.displayMetrics.widthPixels * level.toFloat() / scale).toInt() }
+                bar.requestLayout()
+            }
+        }
+    }
+    private var batteryBar: View? = null
+    private var edgeHandle: View? = null
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            val level = intent?.getIntExtra("level", -1) ?: return
+            val scale = intent.getIntExtra("scale", -1)
+            if (level >= 0 && scale > 0) batteryBar?.let { bar ->
+                bar.layoutParams = bar.layoutParams.apply { width = (resources.displayMetrics.widthPixels * level.toFloat() / scale).toInt() }
+                bar.requestLayout()
+            }
+        }
+    }
 
     private val refreshTask = object : Runnable {
         override fun run() { if (active) { refreshList(false); handler.postDelayed(this, 4000L) } }
@@ -46,6 +76,9 @@ class OverlayService : AccessibilityService() {
             repository = AppRepository(this, store)
             active = true
             createOverlay()
+            createBatteryOverlay()
+            createEdgeHandle()
+            registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             refreshList(true)
             handler.postDelayed(refreshTask, 4000L)
         } catch (_: Throwable) {
@@ -68,7 +101,10 @@ class OverlayService : AccessibilityService() {
     override fun onDestroy() {
         active = false
         handler.removeCallbacksAndMessages(null)
+        runCatching { unregisterReceiver(batteryReceiver) }
         root?.let { runCatching { windowManager.removeView(it) } }
+        batteryBar?.let { runCatching { windowManager.removeView(it) } }
+        edgeHandle?.let { runCatching { windowManager.removeView(it) } }
         root = null; scroll = null; content = null
         super.onDestroy()
     }
@@ -93,6 +129,58 @@ class OverlayService : AccessibilityService() {
         root = panel; scroll = horizontal; content = items
         val params = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(76), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP; y = dp(20) }
         windowManager.addView(panel, params)
+    }
+
+    private fun createBatteryOverlay() {
+        batteryBar = View(this).apply { setBackgroundColor(Color.rgb(70, 210, 130)) }
+        val lp = WindowManager.LayoutParams(0, dp(4), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.BOTTOM }
+        windowManager.addView(batteryBar, lp)
+    }
+
+    private fun createEdgeHandle() {
+        val handle = View(this).apply { setBackgroundColor(Color.TRANSPARENT) }
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(event: MotionEvent) = true
+            override fun onLongPress(event: MotionEvent) { toggleVisibility() }
+            override fun onScroll(first: MotionEvent?, current: MotionEvent, dx: Float, dy: Float): Boolean {
+                if (root?.visibility == View.VISIBLE) scroll?.scrollBy(if (store.invertScroll()) dy.toInt() * 2 else -dy.toInt() * 2, 0)
+                return true
+            }
+        })
+        handle.setOnTouchListener { _, event -> detector.onTouchEvent(event) }
+        edgeHandle = handle
+        val lp = WindowManager.LayoutParams(dp(18), -1, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.END }
+        windowManager.addView(handle, lp)
+    }
+
+    private fun toggleVisibility() {
+        root?.let { view -> view.visibility = if (view.visibility == View.VISIBLE) View.GONE else View.VISIBLE; if (view.visibility == View.VISIBLE) refreshList(true) }
+    }
+
+    private fun createBatteryOverlay() {
+        batteryBar = View(this).apply { setBackgroundColor(Color.rgb(70, 210, 130)) }
+        val lp = WindowManager.LayoutParams(0, dp(4), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.BOTTOM }
+        windowManager.addView(batteryBar, lp)
+    }
+
+    private fun createEdgeHandle() {
+        val handle = View(this).apply { setBackgroundColor(Color.TRANSPARENT) }
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(event: MotionEvent) = true
+            override fun onLongPress(event: MotionEvent) { toggleVisibility() }
+            override fun onScroll(first: MotionEvent?, current: MotionEvent, dx: Float, dy: Float): Boolean {
+                if (root?.visibility == View.VISIBLE) scroll?.scrollBy(if (store.invertScroll()) dy.toInt() * 2 else -dy.toInt() * 2, 0)
+                return true
+            }
+        })
+        handle.setOnTouchListener { _, event -> detector.onTouchEvent(event) }
+        edgeHandle = handle
+        val lp = WindowManager.LayoutParams(dp(18), -1, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.END }
+        windowManager.addView(handle, lp)
+    }
+
+    private fun toggleVisibility() {
+        root?.let { view -> view.visibility = if (view.visibility == View.VISIBLE) View.GONE else View.VISIBLE; if (view.visibility == View.VISIBLE) refreshList(true) }
     }
 
     private fun refreshList(scrollToEnd: Boolean) {
@@ -121,6 +209,8 @@ class OverlayService : AccessibilityService() {
         val menu = PopupMenu(this, anchor)
         menu.menu.add("Предыдущая позиция").setIcon(android.R.drawable.ic_media_previous).setOnMenuItemClickListener { store.movePrevious(entry.packageName, entries); refreshList(false); true }
         menu.menu.add("Скрыть").setIcon(android.R.drawable.ic_menu_view).setOnMenuItemClickListener { store.setHidden(entry.packageName, true); refreshList(false); true }
+        menu.menu.add("Переключить сортировку").setIcon(android.R.drawable.ic_menu_sort_by_size).setOnMenuItemClickListener { val mode = store.toggleSortMode(); Toast.makeText(this, if (mode == SortMode.RECENT) "Сортировка: Недавние" else "Сортировка: По дате установки", Toast.LENGTH_SHORT).show(); page = 0; refreshList(true); true }
+        menu.menu.add("Переключить сортировку").setIcon(android.R.drawable.ic_menu_sort_by_size).setOnMenuItemClickListener { val mode = store.toggleSortMode(); Toast.makeText(this, if (mode == SortMode.RECENT) "Сортировка: Недавние" else "Сортировка: По дате установки", Toast.LENGTH_SHORT).show(); page = 0; refreshList(true); true }
         menu.menu.add("Изменить иконку").setIcon(android.R.drawable.ic_menu_gallery).setOnMenuItemClickListener { chooseIcon(entry.packageName); true }
         menu.menu.add("Настройки приложения").setIcon(android.R.drawable.ic_menu_preferences).setOnMenuItemClickListener { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${entry.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true }
         menu.show()
