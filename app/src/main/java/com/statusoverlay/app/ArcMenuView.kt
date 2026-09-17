@@ -11,7 +11,7 @@ import android.view.View
 import kotlin.math.cos
 import kotlin.math.sin
 
-class ArcMenuView(context: Context, private val actions: List<(View) -> Unit>) : View(context) {
+class ArcMenuView(context: Context, private val actions: List<(View) -> Unit>, private val onDismiss: () -> Unit) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 3f; strokeCap = Paint.Cap.ROUND }
     private val labels = listOf("previous", "hide", "sort", "icon", "settings")
     override fun onDraw(canvas: Canvas) {
@@ -34,7 +34,7 @@ class ArcMenuView(context: Context, private val actions: List<(View) -> Unit>) :
             val angle = Math.toDegrees(kotlin.math.atan2(event.y - cy, event.x - cx).toDouble())
             val index = (((angle - 200 + 360) % 360) / 35).toInt()
             if (index in actions.indices) actions[index](this)
-            (parent as? android.view.ViewGroup)?.let { it.removeView(this) }
+            onDismiss()
         }
         return true
     }

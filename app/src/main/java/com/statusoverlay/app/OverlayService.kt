@@ -163,28 +163,32 @@ class OverlayService : AccessibilityService() {
         page = page.coerceIn(0, pageCount - 1)
         val display = if (paged) entries.drop(page * pageSize).take(pageSize) else entries
         val iconSize = store.iconSize()
-        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), dp(128))) }
+        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), dp(128)).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
         pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
-        if (scrollToEnd && !paged) scroll?.post { scroll?.smoothScrollTo(scroll?.getChildAt(0)?.width ?: 0, 0) }
+        if (scrollToEnd && !paged) scroll?.post {
+            val destination = scroll?.getChildAt(0)?.width ?: 0
+            if (store.renderMode() == RenderMode.SMOOTH) scroll?.smoothScrollTo(destination, 0) else scroll?.scrollTo(destination, 0)
+        }
     }
 
     private fun createAppView(entry: AppEntry): View = ImageView(this).apply {
         val custom = store.customIcon(entry.packageName)
         scaleType = if (custom == null) ImageView.ScaleType.CENTER_CROP else ImageView.ScaleType.FIT_CENTER
-        if (custom == null) setPadding(dp(5), dp(13), dp(5), dp(13)) else setPadding(0, 0, 0, 0)
+        if (custom == null) setPadding(dp((store.iconSize() * 0.05f).toInt()), dp((128 * 0.10f).toInt()), dp((store.iconSize() * 0.05f).toInt()), dp((128 * 0.10f).toInt())) else setPadding(0, 0, 0, 0)
         contentDescription = entry.label
         background = ColorDrawable(Color.TRANSPARENT); setImageDrawable(loadIcon(entry.packageName))
         setOnClickListener { launch(entry) }; setOnLongClickListener { showMenu(this, entry); true }
     }
 
     private fun showMenu(anchor: View, entry: AppEntry) {
-        val menu = ArcMenuView(this, listOf(
+        lateinit var menu: ArcMenuView
+        menu = ArcMenuView(this, listOf(
             { store.movePrevious(entry.packageName, entries); refreshList(false) },
             { store.setHidden(entry.packageName, true); refreshList(false) },
             { store.toggleSortMode(); refreshList(true) },
             { chooseIcon(entry.packageName) },
             { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${entry.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-        ))
+        )) { runCatching { windowManager.removeView(menu) } }
         val lp = WindowManager.LayoutParams(dp(250), dp(170), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.START; x = anchor.left; y = dp(86) }
         windowManager.addView(menu, lp)
     }
