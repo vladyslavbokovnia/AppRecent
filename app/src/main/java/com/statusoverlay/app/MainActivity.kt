@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Swipe
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
                         Text("Способ рендеринга прокрутки", style = MaterialTheme.typography.titleMedium)
                         Choice(Icons.Default.ViewModule, "Все видимые на экране", render == RenderMode.VISIBLE) { render = RenderMode.VISIBLE; store.setRenderMode(render) }
                         Choice(Icons.Default.ViewCarousel, "Постраничный", render == RenderMode.PAGED) { render = RenderMode.PAGED; store.setRenderMode(render) }
+                        Choice(Icons.Default.Swipe, "Плавная прокрутка с анимацией", render == RenderMode.SMOOTH) { render = RenderMode.SMOOTH; store.setRenderMode(render) }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Инвертировать прокрутку по краю"); Switch(checked = invert, onCheckedChange = { invert = it; store.setInvertScroll(it) }) }
                     } }
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Порядок приложений", style = MaterialTheme.typography.titleMedium); Choice(Icons.Default.SwapHoriz, "Недавние — активное приложение в конце", sort == SortMode.RECENT) { sort = SortMode.RECENT; store.setSortMode(sort) }; Choice(Icons.Default.Settings, "По дате установки", sort == SortMode.INSTALL) { sort = SortMode.INSTALL; store.setSortMode(sort) } } }

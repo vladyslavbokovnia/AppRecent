@@ -111,14 +111,14 @@ class OverlayService : AccessibilityService() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        horizontal.addView(items, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(64)))
-        panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(64)))
+        horizontal.addView(items, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(128)))
+        panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(128)))
         root = panel
         scroll = horizontal
         content = items
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            dp(64),
+            dp(128),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             android.graphics.PixelFormat.TRANSLUCENT
@@ -163,25 +163,30 @@ class OverlayService : AccessibilityService() {
         page = page.coerceIn(0, pageCount - 1)
         val display = if (paged) entries.drop(page * pageSize).take(pageSize) else entries
         val iconSize = store.iconSize()
-        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), dp(64))) }
+        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), dp(128))) }
         pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
         if (scrollToEnd && !paged) scroll?.post { scroll?.smoothScrollTo(scroll?.getChildAt(0)?.width ?: 0, 0) }
     }
 
     private fun createAppView(entry: AppEntry): View = ImageView(this).apply {
-        scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(4), dp(4), dp(4), dp(4)); contentDescription = entry.label
+        val custom = store.customIcon(entry.packageName)
+        scaleType = if (custom == null) ImageView.ScaleType.CENTER_CROP else ImageView.ScaleType.FIT_CENTER
+        if (custom == null) setPadding(dp(5), dp(13), dp(5), dp(13)) else setPadding(0, 0, 0, 0)
+        contentDescription = entry.label
         background = ColorDrawable(Color.TRANSPARENT); setImageDrawable(loadIcon(entry.packageName))
         setOnClickListener { launch(entry) }; setOnLongClickListener { showMenu(this, entry); true }
     }
 
     private fun showMenu(anchor: View, entry: AppEntry) {
-        val menu = PopupMenu(this, anchor)
-        menu.menu.add("Предыдущая позиция").setIcon(android.R.drawable.ic_media_previous).setOnMenuItemClickListener { store.movePrevious(entry.packageName, entries); refreshList(false); true }
-        menu.menu.add("Скрыть").setIcon(android.R.drawable.ic_menu_view).setOnMenuItemClickListener { store.setHidden(entry.packageName, true); refreshList(false); true }
-        menu.menu.add("Переключить сортировку").setIcon(android.R.drawable.ic_menu_sort_by_size).setOnMenuItemClickListener { val mode = store.toggleSortMode(); Toast.makeText(this, if (mode == SortMode.RECENT) "Сортировка: Недавние" else "Сортировка: По дате установки", Toast.LENGTH_SHORT).show(); page = 0; refreshList(true); true }
-        menu.menu.add("Изменить иконку").setIcon(android.R.drawable.ic_menu_gallery).setOnMenuItemClickListener { chooseIcon(entry.packageName); true }
-        menu.menu.add("Настройки приложения").setIcon(android.R.drawable.ic_menu_preferences).setOnMenuItemClickListener { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${entry.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true }
-        menu.show()
+        val menu = ArcMenuView(this, listOf(
+            { store.movePrevious(entry.packageName, entries); refreshList(false) },
+            { store.setHidden(entry.packageName, true); refreshList(false) },
+            { store.toggleSortMode(); refreshList(true) },
+            { chooseIcon(entry.packageName) },
+            { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${entry.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        ))
+        val lp = WindowManager.LayoutParams(dp(250), dp(170), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.START; x = anchor.left; y = dp(86) }
+        windowManager.addView(menu, lp)
     }
 
     private fun chooseIcon(packageName: String) {

@@ -3,9 +3,8 @@ package com.statusoverlay.app
 import android.content.Context
 import android.content.SharedPreferences
 
-enum class RenderMode { VISIBLE, PAGED }
+enum class RenderMode { VISIBLE, PAGED, SMOOTH }
 enum class SortMode { RECENT, INSTALL }
-
 data class AppEntry(val packageName: String, val label: String, val lastUsed: Long, val installTime: Long)
 
 class AppStore(context: Context) {
@@ -24,21 +23,12 @@ class AppStore(context: Context) {
     fun invertScroll(): Boolean = prefs.getBoolean("invert_scroll", false)
     fun setInvertScroll(value: Boolean) = prefs.edit().putBoolean("invert_scroll", value).apply()
     fun iconSize(): Int = prefs.getInt("icon_size", 96)
-    fun setIconSize(value: Int) = prefs.edit().putInt("icon_size", value.coerceIn(48, 92)).apply()
+    fun setIconSize(value: Int) = prefs.edit().putInt("icon_size", value.coerceIn(48, 96)).apply()
     fun activePackage(): String? = prefs.getString("active_package", null)
     fun setActivePackage(packageName: String) = prefs.edit().putString("active_package", packageName).apply()
     fun overrides(): List<String> = prefs.getString("order_overrides", "")!!.split('|').filter(String::isNotBlank)
     fun setOverrides(order: List<String>) = prefs.edit().putString("order_overrides", order.distinct().joinToString("|")).apply()
-
-    fun applyManualOrder(entries: List<AppEntry>): List<AppEntry> {
-        val byPackage = entries.associateBy { it.packageName }
-        val manual = overrides().mapNotNull(byPackage::get)
-        return manual + entries.filterNot { it.packageName in manual.map(AppEntry::packageName).toSet() }
-    }
-    fun movePrevious(packageName: String, entries: List<AppEntry>) {
-        val order = applyManualOrder(entries).map(AppEntry::packageName).toMutableList()
-        val index = order.indexOf(packageName)
-        if (index > 0) { val item = order.removeAt(index); order.add(index - 1, item); setOverrides(order) }
-    }
+    fun applyManualOrder(entries: List<AppEntry>): List<AppEntry> { val byPackage = entries.associateBy { it.packageName }; val manual = overrides().mapNotNull(byPackage::get); return manual + entries.filterNot { it.packageName in manual.map(AppEntry::packageName).toSet() } }
+    fun movePrevious(packageName: String, entries: List<AppEntry>) { val order = applyManualOrder(entries).map(AppEntry::packageName).toMutableList(); val index = order.indexOf(packageName); if (index > 0) { val item = order.removeAt(index); order.add(index - 1, item); setOverrides(order) } }
     fun launched(packageName: String) { setOverrides(overrides().filterNot { it == packageName }) }
 }
