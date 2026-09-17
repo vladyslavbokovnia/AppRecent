@@ -21,6 +21,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ViewCarousel
+import androidx.compose.material.icons.filled.ViewModule
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -58,18 +61,18 @@ class MainActivity : ComponentActivity() {
                     PermissionCard("Служба специальных возможностей", accessibilityGranted()) { open(Settings.ACTION_ACCESSIBILITY_SETTINGS) }
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Способ рендеринга прокрутки", style = MaterialTheme.typography.titleMedium)
-                        Choice("Все видимые на экране", render == RenderMode.VISIBLE) { render = RenderMode.VISIBLE; store.setRenderMode(render) }
-                        Choice("Постраничный", render == RenderMode.PAGED) { render = RenderMode.PAGED; store.setRenderMode(render) }
+                        Choice(Icons.Default.ViewModule, "Все видимые на экране", render == RenderMode.VISIBLE) { render = RenderMode.VISIBLE; store.setRenderMode(render) }
+                        Choice(Icons.Default.ViewCarousel, "Постраничный", render == RenderMode.PAGED) { render = RenderMode.PAGED; store.setRenderMode(render) }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Инвертировать прокрутку по краю"); Switch(checked = invert, onCheckedChange = { invert = it; store.setInvertScroll(it) }) }
                     } }
-                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Порядок приложений", style = MaterialTheme.typography.titleMedium); Choice("Недавние — активное приложение в конце", sort == SortMode.RECENT) { sort = SortMode.RECENT; store.setSortMode(sort) }; Choice("По дате установки", sort == SortMode.INSTALL) { sort = SortMode.INSTALL; store.setSortMode(sort) } } }
+                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("Порядок приложений", style = MaterialTheme.typography.titleMedium); Choice(Icons.Default.SwapHoriz, "Недавние — активное приложение в конце", sort == SortMode.RECENT) { sort = SortMode.RECENT; store.setSortMode(sort) }; Choice(Icons.Default.Settings, "По дате установки", sort == SortMode.INSTALL) { sort = SortMode.INSTALL; store.setSortMode(sort) } } }
                     Button(onClick = { open(Settings.ACTION_ACCESSIBILITY_SETTINGS) }, modifier = Modifier.fillMaxWidth()) { Text("Запустить / настроить панель") }
                     Spacer(Modifier.height(24.dp))
                 }
             }
         }
     }
-    @Composable private fun Choice(text: String, selected: Boolean, onClick: () -> Unit) { Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) { RadioButton(selected, onClick); Text(text) } }
+    @Composable private fun Choice(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, selected: Boolean, onClick: () -> Unit) { Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(icon, contentDescription = text); RadioButton(selected, onClick); Text(text) } }
     @Composable private fun PermissionCard(title: String, granted: Boolean, action: () -> Unit) { Card(Modifier.fillMaxWidth()) { Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column(Modifier.weight(1f)) { Text(title); Text(if (granted) "Разрешено" else "Требуется разрешение", color = if (granted) Color(0xFF75D69A) else MaterialTheme.colorScheme.error) }; Button(action) { Text(if (granted) "Открыть" else "Разрешить") } } } }
     private fun usageGranted(): Boolean { val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager; return appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), packageName) == AppOpsManager.MODE_ALLOWED }
     private fun accessibilityGranted(): Boolean { val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false; return enabled.contains("$packageName/${OverlayService::class.java.name}") }
