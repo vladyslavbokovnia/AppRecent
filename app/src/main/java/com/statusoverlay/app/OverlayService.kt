@@ -97,23 +97,32 @@ class OverlayService : AccessibilityService() {
 
     private fun createOverlay() {
         val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(3), dp(3), dp(3), dp(3)); setBackgroundColor(Color.argb(238, 21, 26, 34))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.argb(170, 0, 0, 0))
+            setPadding(0, 0, 0, 0)
         }
-        panel.addView(iconButton(android.R.drawable.ic_menu_close_clear_cancel, "Скрыть панель") { panel.visibility = View.GONE }, LinearLayout.LayoutParams(dp(42), dp(68)))
-        val back = iconButton(android.R.drawable.ic_media_previous, "Предыдущая страница") { page = (page - 1).coerceAtLeast(0); refreshList(true) }
-        panel.addView(back, LinearLayout.LayoutParams(dp(40), dp(68)))
-        val horizontal = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER }
-        val items = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        horizontal.addView(items, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT))
-        panel.addView(horizontal, LinearLayout.LayoutParams(0, dp(68), 1f))
-        val next = iconButton(android.R.drawable.ic_media_next, "Следующая страница") { page = (page + 1).coerceAtMost(pageCount - 1); refreshList(true) }
-        panel.addView(next, LinearLayout.LayoutParams(dp(40), dp(68)))
-        val indicator = TextView(this).apply { setTextColor(Color.LTGRAY); textSize = 11f; gravity = Gravity.CENTER; contentDescription = "Индикатор страницы" }
-        pageIndicator = indicator
-        panel.addView(indicator, LinearLayout.LayoutParams(dp(34), dp(68)))
-        root = panel; scroll = horizontal; content = items
-        val params = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(76), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP; y = dp(20) }
+        val horizontal = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            setBackgroundColor(Color.TRANSPARENT)
+        }
+        val items = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        horizontal.addView(items, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(64)))
+        panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(64)))
+        root = panel
+        scroll = horizontal
+        content = items
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            dp(64),
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            android.graphics.PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.TOP }
         windowManager.addView(panel, params)
     }
 
@@ -154,7 +163,7 @@ class OverlayService : AccessibilityService() {
         page = page.coerceIn(0, pageCount - 1)
         val display = if (paged) entries.drop(page * pageSize).take(pageSize) else entries
         val iconSize = store.iconSize()
-        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), dp(iconSize))) }
+        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), dp(64))) }
         pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
         if (scrollToEnd && !paged) scroll?.post { scroll?.smoothScrollTo(scroll?.getChildAt(0)?.width ?: 0, 0) }
     }
@@ -169,7 +178,6 @@ class OverlayService : AccessibilityService() {
         val menu = PopupMenu(this, anchor)
         menu.menu.add("Предыдущая позиция").setIcon(android.R.drawable.ic_media_previous).setOnMenuItemClickListener { store.movePrevious(entry.packageName, entries); refreshList(false); true }
         menu.menu.add("Скрыть").setIcon(android.R.drawable.ic_menu_view).setOnMenuItemClickListener { store.setHidden(entry.packageName, true); refreshList(false); true }
-        menu.menu.add("Переключить сортировку").setIcon(android.R.drawable.ic_menu_sort_by_size).setOnMenuItemClickListener { val mode = store.toggleSortMode(); Toast.makeText(this, if (mode == SortMode.RECENT) "Сортировка: Недавние" else "Сортировка: По дате установки", Toast.LENGTH_SHORT).show(); page = 0; refreshList(true); true }
         menu.menu.add("Переключить сортировку").setIcon(android.R.drawable.ic_menu_sort_by_size).setOnMenuItemClickListener { val mode = store.toggleSortMode(); Toast.makeText(this, if (mode == SortMode.RECENT) "Сортировка: Недавние" else "Сортировка: По дате установки", Toast.LENGTH_SHORT).show(); page = 0; refreshList(true); true }
         menu.menu.add("Изменить иконку").setIcon(android.R.drawable.ic_menu_gallery).setOnMenuItemClickListener { chooseIcon(entry.packageName); true }
         menu.menu.add("Настройки приложения").setIcon(android.R.drawable.ic_menu_preferences).setOnMenuItemClickListener { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${entry.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true }
