@@ -17,7 +17,14 @@ class ArcMenuView(context: Context, private val actions: List<(View) -> Unit>, p
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val cx = width / 2f; val cy = height * .92f; val radius = width * .34f
-        for (i in labels.indices) drawGlyph(canvas, labels[i], cx + cos(Math.toRadians((200 + i * 35).toDouble())).toFloat() * radius, cy + sin(Math.toRadians((200 + i * 35).toDouble())).toFloat() * radius)
+        for (i in labels.indices) {
+            val x = cx + cos(Math.toRadians((200 + i * 35).toDouble())).toFloat() * radius
+            val y = cy + sin(Math.toRadians((200 + i * 35).toDouble())).toFloat() * radius
+            canvas.save()
+            canvas.scale(3f, 3f, x, y)
+            drawGlyph(canvas, labels[i], x, y)
+            canvas.restore()
+        }
     }
     private fun drawGlyph(c: Canvas, type: String, x: Float, y: Float) {
         when (type) {
