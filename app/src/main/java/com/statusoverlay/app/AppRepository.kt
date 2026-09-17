@@ -11,8 +11,10 @@ class AppRepository(private val context: Context, private val store: AppStore = 
     fun load(): List<AppEntry> {
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val queried = pm.queryIntentActivities(launcher, PackageManager.MATCH_ALL).map { it.activityInfo.packageName }
-        val installed = pm.getInstalledApplications(PackageManager.MATCH_ALL).map { it.packageName }
-        val packages = (queried + installed + packageNameOfSelf()).distinct()
+        val installedLaunchable = pm.getInstalledApplications(PackageManager.MATCH_ALL)
+            .filter { it.enabled && pm.getLaunchIntentForPackage(it.packageName) != null }
+            .map { it.packageName }
+        val packages = (queried + installedLaunchable + packageNameOfSelf()).distinct()
         val now = System.currentTimeMillis()
         val usage = mutableMapOf<String, Long>()
         (context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager)
