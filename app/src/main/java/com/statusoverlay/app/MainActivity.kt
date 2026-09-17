@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,12 +48,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 
 class MainActivity : ComponentActivity() {
     private lateinit var store: AppStore
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); store = AppStore(this); setContent { SettingsScreen() } }
-    override fun onResume() { super.onResume() }
+    private lateinit var repository: AppRepository
+    private var resumeTick by mutableIntStateOf(0)
+    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); store = AppStore(this); repository = AppRepository(this, store); setContent { SettingsScreen() } }
+    override fun onResume() { super.onResume(); resumeTick++ }
     private fun open(action: String, data: Uri? = null) { startActivity(Intent(action).apply { data?.let(::setData) }) }
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable private fun SettingsScreen() {
+        val currentTick = resumeTick
         var render by remember { mutableStateOf(store.renderMode()) }; var sort by remember { mutableStateOf(store.sortMode()) }; var invert by remember { mutableStateOf(store.invertScroll()) }; var iconSize by remember { mutableStateOf(store.iconSize().toFloat()) }
+        var hidden by remember(currentTick) { mutableStateOf(repository.hiddenEntries()) }
         MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF10131A), surface = Color(0xFF191E28), primary = Color(0xFF9DB7FF))) {
             Scaffold(topBar = { TopAppBar(title = { Text("AppRecent") }, navigationIcon = { androidx.compose.material3.Icon(Icons.Default.Settings, "Настройки") }) }) { pad ->
                 Column(Modifier.fillMaxSize().padding(pad).padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -71,6 +76,11 @@ class MainActivity : ComponentActivity() {
                         Choice(Icons.Default.Settings, "Размер иконок: ${iconSize.toInt()} dp", false) { }
                         Slider(value = iconSize, onValueChange = { iconSize = it; store.setIconSize(it.toInt()) }, valueRange = 48f..92f, steps = 10)
                         Text("Изменение применяется к панели после обновления списка.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } }
+                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Скрытые приложения", style = MaterialTheme.typography.titleMedium)
+                        if (hidden.isEmpty()) Text("Нет скрытых приложений", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        hidden.forEach { item -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(item.label, Modifier.weight(1f)); androidx.compose.material3.TextButton(onClick = { store.setHidden(item.packageName, false); hidden = repository.hiddenEntries() }) { Text("Вернуть") } } }
                     } }
                     Button(onClick = { open(Settings.ACTION_ACCESSIBILITY_SETTINGS) }, modifier = Modifier.fillMaxWidth()) { Text("Запустить / настроить панель") }
                     Spacer(Modifier.height(24.dp))

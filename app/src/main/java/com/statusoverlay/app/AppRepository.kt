@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 
 class AppRepository(private val context: Context, private val store: AppStore = AppStore(context)) {
     private val pm: PackageManager = context.packageManager
+    fun hiddenEntries(): List<AppEntry> = store.hidden().mapNotNull { pkg -> runCatching { val info = pm.getApplicationInfo(pkg, 0); AppEntry(pkg, pm.getApplicationLabel(info).toString(), 0L, pm.getPackageInfo(pkg, 0).firstInstallTime) }.getOrNull() }.sortedBy { it.label.lowercase() }
     fun load(): List<AppEntry> {
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val packages = pm.queryIntentActivities(launcher, PackageManager.MATCH_ALL).map { it.activityInfo.packageName }.distinct()

@@ -9,15 +9,18 @@ enum class SortMode { RECENT, INSTALL }
 data class AppEntry(val packageName: String, val label: String, val lastUsed: Long, val installTime: Long)
 
 class AppStore(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("app_recent", Context.MODE_PRIVATE)
-    fun hidden(): Set<String> = prefs.getStringSet("hidden", emptySet())?.toSet() ?: emptySet()
-    fun setHidden(packageName: String, value: Boolean) { val set = hidden().toMutableSet(); if (value) set += packageName else set -= packageName; prefs.edit().putStringSet("hidden", set).apply() }
-    fun customIcon(packageName: String): String? = prefs.getString("icon_$packageName", null)
-    fun setCustomIcon(packageName: String, uri: String?) = prefs.edit().apply { if (uri == null) remove("icon_$packageName") else putString("icon_$packageName", uri) }.apply()
+    private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    private val hiddenPrefs: SharedPreferences = context.getSharedPreferences("hidden_apps", Context.MODE_PRIVATE)
+    private val iconPrefs: SharedPreferences = context.getSharedPreferences("custom_icons", Context.MODE_PRIVATE)
+    fun hidden(): Set<String> = hiddenPrefs.getStringSet("hidden_list", emptySet())?.toSet() ?: emptySet()
+    fun setHidden(packageName: String, value: Boolean) { val set = hidden().toMutableSet(); if (value) set += packageName else set -= packageName; hiddenPrefs.edit().putStringSet("hidden_list", set).apply() }
+    fun customIcon(packageName: String): String? = iconPrefs.getString(packageName, null)
+    fun setCustomIcon(packageName: String, uri: String?) = iconPrefs.edit().apply { if (uri == null) remove(packageName) else putString(packageName, uri) }.apply()
     fun renderMode(): RenderMode = runCatching { RenderMode.valueOf(prefs.getString("render_mode", RenderMode.VISIBLE.name)!!) }.getOrDefault(RenderMode.VISIBLE)
     fun setRenderMode(mode: RenderMode) = prefs.edit().putString("render_mode", mode.name).apply()
-    fun sortMode(): SortMode = runCatching { SortMode.valueOf(prefs.getString("sort_mode", SortMode.RECENT.name)!!) }.getOrDefault(SortMode.RECENT)
-    fun setSortMode(mode: SortMode) = prefs.edit().putString("sort_mode", mode.name).apply()
+    fun sortMode(): SortMode = if (prefs.getString("sort_mode", "usage") == "install") SortMode.INSTALL else SortMode.RECENT
+    fun setSortMode(mode: SortMode) = prefs.edit().putString("sort_mode", if (mode == SortMode.INSTALL) "install" else "usage").apply()
+    fun toggleSortMode(): SortMode { val next = if (sortMode() == SortMode.RECENT) SortMode.INSTALL else SortMode.RECENT; setSortMode(next); return next }
     fun invertScroll(): Boolean = prefs.getBoolean("invert_scroll", false)
     fun setInvertScroll(value: Boolean) = prefs.edit().putBoolean("invert_scroll", value).apply()
     fun iconSize(): Int = prefs.getInt("icon_size", 68)
