@@ -14,7 +14,8 @@ class AppRepository(private val context: Context, private val store: AppStore = 
         val installedLaunchable = pm.getInstalledApplications(PackageManager.MATCH_ALL)
             .filter { it.enabled && pm.getLaunchIntentForPackage(it.packageName) != null }
             .map { it.packageName }
-        val packages = (queried + installedLaunchable + packageNameOfSelf()).distinct()
+        val hidden = store.hidden()
+        val packages = (queried + installedLaunchable + packageNameOfSelf()).distinct().filterNot { it in hidden }
         val now = System.currentTimeMillis()
         val usage = mutableMapOf<String, Long>()
         (context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager)
@@ -29,7 +30,7 @@ class AppRepository(private val context: Context, private val store: AppStore = 
             SortMode.INSTALL -> result.sortedWith(compareByDescending<AppEntry> { it.installTime }.thenBy { it.label.lowercase() })
             SortMode.RECENT -> result.sortedWith(compareBy<AppEntry> { it.lastUsed }.thenBy { it.label.lowercase() })
         }
-        return (if (store.sortMode() == SortMode.RECENT) sorted else store.applyManualOrder(sorted))
+        return sorted
     }
 
     private fun packageNameOfSelf(): String = context.packageName

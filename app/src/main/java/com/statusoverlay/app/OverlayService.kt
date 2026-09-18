@@ -102,17 +102,21 @@ class OverlayService : AccessibilityService() {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             setBackgroundColor(Color.argb(170, 0, 0, 0))
             setPadding(0, 0, 0, 0)
         }
         val horizontal = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
+            isSmoothScrollingEnabled = true
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             setBackgroundColor(Color.TRANSPARENT)
         }
         val items = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
         }
         horizontal.addView(items, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, overlayHeight))
         panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, overlayHeight))
@@ -144,7 +148,7 @@ class OverlayService : AccessibilityService() {
         val handle = View(this).apply { setBackgroundColor(Color.TRANSPARENT) }
         val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(event: MotionEvent) = true
-            override fun onLongPress(event: MotionEvent) { toggleVisibility() }
+            override fun onSingleTapUp(event: MotionEvent): Boolean { toggleVisibility(); return true }
             override fun onScroll(first: MotionEvent?, current: MotionEvent, dx: Float, dy: Float): Boolean {
                 if (root?.visibility == View.VISIBLE) scroll?.scrollBy(if (store.invertScroll()) dy.toInt() * 2 else -dy.toInt() * 2, 0)
                 return true
@@ -162,8 +166,12 @@ class OverlayService : AccessibilityService() {
 
     private fun refreshList(scrollToEnd: Boolean) {
         if (!active) return
-        entries = runCatching { repository.load() }.getOrDefault(emptyList())
+        val oldPackages = entries.map { it.packageName }
+        val loaded = runCatching { repository.load() }.getOrDefault(emptyList())
+        entries = loaded
         val target = content ?: return
+        val newPackages = loaded.map { it.packageName }
+        if (newPackages == oldPackages && target.childCount == entries.size) return
         target.removeAllViews()
         val paged = false
         pageCount = 1
