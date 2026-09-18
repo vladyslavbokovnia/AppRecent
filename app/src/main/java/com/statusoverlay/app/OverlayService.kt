@@ -49,8 +49,7 @@ class OverlayService : AccessibilityService() {
     private var overlayHeightPx = 128
     private var renderedIconSize = -1
     private var renderedGradientAlpha = -1
-    private var batteryTrack: View? = null
-    private var batteryBar: View? = null
+    private var batteryBar: BatteryBarView? = null
     private var batteryCharging = false
     private val batteryBlink = object : Runnable {
         override fun run() {
@@ -69,10 +68,7 @@ class OverlayService : AccessibilityService() {
             batteryCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
             handler.removeCallbacks(batteryBlink)
             handler.post(batteryBlink)
-            if (level >= 0 && scale > 0) batteryBar?.let { bar ->
-                bar.layoutParams = bar.layoutParams.apply { width = (resources.displayMetrics.widthPixels * level.toFloat() / scale).toInt() }
-                bar.requestLayout()
-            }
+            if (level >= 0 && scale > 0) batteryBar?.setLevel(level.toFloat() / scale.toFloat())
         }
     }
 
@@ -116,7 +112,6 @@ class OverlayService : AccessibilityService() {
         runCatching { unregisterReceiver(batteryReceiver) }
         root?.let { runCatching { windowManager.removeView(it) } }
         batteryBar?.let { runCatching { windowManager.removeView(it) } }
-        batteryTrack?.let { runCatching { windowManager.removeView(it) } }
         edgeHandle?.let { runCatching { windowManager.removeView(it) } }
         root = null; scroll = null; content = null
         super.onDestroy()
@@ -166,12 +161,25 @@ class OverlayService : AccessibilityService() {
 
     private fun createBatteryOverlay() {
         val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        batteryTrack = View(this).apply { setBackgroundColor(Color.BLACK) }
-        val trackLp = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(2), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.BOTTOM }
-        windowManager.addView(batteryTrack, trackLp)
-        batteryBar = View(this).apply { setBackgroundColor(Color.WHITE) }
-        val barLp = WindowManager.LayoutParams(0, dp(2), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.BOTTOM }
-        windowManager.addView(batteryBar, barLp)
+        batteryBar = BatteryBarView(this)
+        val lp = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(2), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, android.graphics.PixelFormat.TRANSLUCENT).apply {
+            gravity = Gravity.TOP
+            y = resources.displayMetrics.heightPixels - dp(2)
+        }
+        windowManager.addView(batteryBar, lp)
+    }
+
+    private class BatteryBarView(context: android.content.Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private var level = 0f
+        fun setLevel(value: Float) { level = value.coerceIn(0f, 1f); invalidate() }
+        override fun onDraw(canvas: android.graphics.Canvas) {
+            paint.style = Paint.Style.FILL
+            paint.color = Color.BLACK
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+            paint.color = Color.WHITE
+            canvas.drawRect(0f, 0f, width * level, height.toFloat(), paint)
+        }
     }
 
     private fun createEdgeHandle() {
