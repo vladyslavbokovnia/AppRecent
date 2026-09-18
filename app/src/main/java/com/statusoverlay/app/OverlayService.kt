@@ -55,15 +55,6 @@ class OverlayService : AccessibilityService() {
     private var batteryCharging = false
     private var batteryAnimator: ValueAnimator? = null
     private var edgeHandle: View? = null
-    private val rowSwipeDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-        override fun onDown(event: MotionEvent) = true
-        override fun onFling(first: MotionEvent?, current: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
-            if (!store.expandRows() || kotlin.math.abs(velocityY) < 250f) return false
-            val shouldExpand = velocityY < 0f
-            if (shouldExpand != expandedNow) { expandedNow = shouldExpand; refreshList(false) }
-            return true
-        }
-    })
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: Intent?) {
             val level = intent?.getIntExtra("level", -1) ?: return
@@ -249,7 +240,6 @@ class OverlayService : AccessibilityService() {
             val perRow = maxOf(1, resources.displayMetrics.widthPixels / dp(iconSize))
             display.chunked(perRow).forEachIndexed { rowIndex, chunk ->
                 val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-                if (rowIndex == 0) row.setOnTouchListener { _, event -> rowSwipeDetector.onTouchEvent(event) }
                 chunk.forEach { row.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx)) }
                 target.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, overlayHeightPx))
             }
@@ -258,7 +248,6 @@ class OverlayService : AccessibilityService() {
             resizeOverlay(rows * overlayHeightPx)
         } else {
             display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
-            target.setOnTouchListener { _, event -> rowSwipeDetector.onTouchEvent(event) }
             target.layoutParams = target.layoutParams.apply { height = overlayHeightPx }
             resizeOverlay(overlayHeightPx)
         }
@@ -282,7 +271,6 @@ class OverlayService : AccessibilityService() {
         return AlphaIconView(this, loadIcon(entry.packageName), custom == null, store.bottomGradientAlpha()).apply {
             setOnClickListener { launch(entry) }
             setOnLongClickListener { showMenu(this, entry); true }
-            setOnTouchListener { _, event -> rowSwipeDetector.onTouchEvent(event); false }
             contentDescription = entry.label
         }
     }
