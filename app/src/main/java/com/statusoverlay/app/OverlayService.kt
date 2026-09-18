@@ -31,6 +31,7 @@ import android.os.Handler
 import android.os.Looper
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
+import android.os.BatteryManager
 
 class OverlayService : AccessibilityService() {
     private lateinit var windowManager: WindowManager
@@ -48,12 +49,26 @@ class OverlayService : AccessibilityService() {
     private var overlayHeightPx = 128
     private var renderedIconSize = -1
     private var renderedGradientAlpha = -1
+    private var batteryTrack: View? = null
     private var batteryBar: View? = null
+    private var batteryCharging = false
+    private val batteryBlink = object : Runnable {
+        override fun run() {
+            if (batteryCharging) {
+                batteryBar?.alpha = if (batteryBar?.alpha == 1f) 0.22f else 1f
+                handler.postDelayed(this, 500L)
+            } else batteryBar?.alpha = 1f
+        }
+    }
     private var edgeHandle: View? = null
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: Intent?) {
             val level = intent?.getIntExtra("level", -1) ?: return
             val scale = intent.getIntExtra("scale", -1)
+            val status = intent.getIntExtra("status", BatteryManager.BATTERY_STATUS_UNKNOWN)
+            batteryCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+            handler.removeCallbacks(batteryBlink)
+            handler.post(batteryBlink)
             if (level >= 0 && scale > 0) batteryBar?.let { bar ->
                 bar.layoutParams = bar.layoutParams.apply { width = (resources.displayMetrics.widthPixels * level.toFloat() / scale).toInt() }
                 bar.requestLayout()
@@ -101,6 +116,7 @@ class OverlayService : AccessibilityService() {
         runCatching { unregisterReceiver(batteryReceiver) }
         root?.let { runCatching { windowManager.removeView(it) } }
         batteryBar?.let { runCatching { windowManager.removeView(it) } }
+        batteryTrack?.let { runCatching { windowManager.removeView(it) } }
         edgeHandle?.let { runCatching { windowManager.removeView(it) } }
         root = null; scroll = null; content = null
         super.onDestroy()
@@ -149,9 +165,13 @@ class OverlayService : AccessibilityService() {
     }
 
     private fun createBatteryOverlay() {
-        batteryBar = View(this).apply { setBackgroundColor(Color.rgb(70, 210, 130)) }
-        val lp = WindowManager.LayoutParams(0, dp(4), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.BOTTOM }
-        windowManager.addView(batteryBar, lp)
+        val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        batteryTrack = View(this).apply { setBackgroundColor(Color.BLACK) }
+        val trackLp = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(2), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.BOTTOM }
+        windowManager.addView(batteryTrack, trackLp)
+        batteryBar = View(this).apply { setBackgroundColor(Color.WHITE) }
+        val barLp = WindowManager.LayoutParams(0, dp(2), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags, android.graphics.PixelFormat.TRANSLUCENT).apply { gravity = Gravity.BOTTOM }
+        windowManager.addView(batteryBar, barLp)
     }
 
     private fun createEdgeHandle() {
@@ -209,7 +229,6 @@ class OverlayService : AccessibilityService() {
     }
 
     private class AlphaIconView(context: android.content.Context, private val icon: Drawable?, private val cropSystemIcon: Boolean, private val fadeAmount: Int) : View(context) {
-        private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
         override fun onDraw(canvas: android.graphics.Canvas) {
             super.onDraw(canvas)
@@ -217,9 +236,16 @@ class OverlayService : AccessibilityService() {
             val path = android.graphics.Path().apply { addRoundRect(RectF(0f, 0f, width.toFloat(), height.toFloat()), floatArrayOf(0f, 0f, 0f, 0f, radius, radius, radius, radius), android.graphics.Path.Direction.CW) }
             canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
             canvas.clipPath(path)
-            val insetX = if (cropSystemIcon) width * .05f else 0f
-            val insetY = if (cropSystemIcon) height * .10f else 0f
-            icon?.setBounds(insetX.toInt(), insetY.toInt(), (width - insetX).toInt(), (height - insetY).toInt())
+            val boxW = if (cropSystemIcon) width / .80f else width.toFloat()
+            val boxH = height.toFloat()
+            val iw = icon?.intrinsicWidth?.takeIf { it > 0 }?.toFloat() ?: boxW
+            val ih = icon?.intrinsicHeight?.takeIf { it > 0 }?.toFloat() ?: boxH
+            val scale = if (cropSystemIcon) maxOf(boxW / iw, boxH / ih) else minOf(boxW / iw, boxH / ih)
+            val drawW = iw * scale
+            val drawH = ih * scale
+            val left = (width - drawW) / 2f
+            val top = (height - drawH) / 2f
+            icon?.setBounds(left.toInt(), top.toInt(), (left + drawW).toInt(), (top + drawH).toInt())
             icon?.draw(canvas)
             maskPaint.shader = LinearGradient(0f, 0f, 0f, height.toFloat(), Color.WHITE, Color.argb(255 - fadeAmount, 255, 255, 255), Shader.TileMode.CLAMP)
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), maskPaint)
