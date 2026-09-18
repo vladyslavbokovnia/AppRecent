@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.Settings
 import android.view.Gravity
@@ -16,6 +17,7 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.FrameLayout
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
@@ -38,6 +40,8 @@ class OverlayService : AccessibilityService() {
     private var pageCount = 1
     private var pageIndicator: TextView? = null
     private var overlayHeightPx = 128
+    private var renderedIconSize = -1
+    private var renderedGradientAlpha = -1
     private var batteryBar: View? = null
     private var edgeHandle: View? = null
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -103,7 +107,7 @@ class OverlayService : AccessibilityService() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            setBackgroundColor(Color.argb(170, 0, 0, 0))
+            setBackgroundColor(Color.TRANSPARENT)
             setPadding(0, 0, 0, 0)
         }
         val horizontal = HorizontalScrollView(this).apply {
@@ -171,14 +175,17 @@ class OverlayService : AccessibilityService() {
         entries = loaded
         val target = content ?: return
         val newPackages = loaded.map { it.packageName }
-        if (newPackages == oldPackages && target.childCount == entries.size) return
+        val iconSize = store.iconSize()
+        val gradientAlpha = store.bottomGradientAlpha()
+        if (newPackages == oldPackages && target.childCount == entries.size && iconSize == renderedIconSize && gradientAlpha == renderedGradientAlpha) return
         target.removeAllViews()
         val paged = false
         pageCount = 1
         page = 0
         val display = entries
-        val iconSize = store.iconSize()
         display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
+        renderedIconSize = iconSize
+        renderedGradientAlpha = gradientAlpha
         pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
         if (scrollToEnd && !paged) scroll?.post {
             val destination = scroll?.getChildAt(0)?.width ?: 0
@@ -186,13 +193,28 @@ class OverlayService : AccessibilityService() {
         }
     }
 
-    private fun createAppView(entry: AppEntry): View = ImageView(this).apply {
+    private fun createAppView(entry: AppEntry): View {
         val custom = store.customIcon(entry.packageName)
-        scaleType = if (custom == null) ImageView.ScaleType.CENTER_CROP else ImageView.ScaleType.FIT_CENTER
-        if (custom == null) setPadding(dp((store.iconSize() * 0.05f).toInt()), (overlayHeightPx * 0.10f).toInt(), dp((store.iconSize() * 0.05f).toInt()), (overlayHeightPx * 0.10f).toInt()) else setPadding(0, 0, 0, 0)
-        contentDescription = entry.label
-        background = ColorDrawable(Color.TRANSPARENT); setImageDrawable(loadIcon(entry.packageName))
-        setOnClickListener { launch(entry) }; setOnLongClickListener { showMenu(this, entry); true }
+        val image = ImageView(this).apply {
+            scaleType = if (custom == null) ImageView.ScaleType.CENTER_CROP else ImageView.ScaleType.FIT_CENTER
+            if (custom == null) setPadding(dp((store.iconSize() * 0.05f).toInt()), (overlayHeightPx * 0.10f).toInt(), dp((store.iconSize() * 0.05f).toInt()), (overlayHeightPx * 0.10f).toInt()) else setPadding(0, 0, 0, 0)
+            contentDescription = entry.label
+            background = ColorDrawable(Color.TRANSPARENT)
+            setImageDrawable(loadIcon(entry.packageName))
+        }
+        val gradient = View(this).apply {
+            isClickable = false
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.TRANSPARENT, Color.argb(store.bottomGradientAlpha(), 0, 0, 0))).apply {
+                cornerRadii = floatArrayOf(0f, 0f, 0f, 0f, dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
+            }
+        }
+        return FrameLayout(this).apply {
+            setBackgroundColor(Color.TRANSPARENT)
+            addView(image, FrameLayout.LayoutParams(-1, -1))
+            addView(gradient, FrameLayout.LayoutParams(-1, -1))
+            setOnClickListener { launch(entry) }
+            setOnLongClickListener { showMenu(this, entry); true }
+        }
     }
 
     private fun showMenu(anchor: View, entry: AppEntry) {
