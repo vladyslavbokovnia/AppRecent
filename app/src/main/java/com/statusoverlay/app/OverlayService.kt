@@ -208,8 +208,13 @@ class OverlayService : AccessibilityService() {
                 cornerRadii = floatArrayOf(0f, 0f, 0f, 0f, dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
             }
         }
+        val mask = GradientDrawable().apply {
+            setColor(Color.TRANSPARENT)
+            cornerRadii = floatArrayOf(0f, 0f, 0f, 0f, dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
+        }
         return FrameLayout(this).apply {
-            setBackgroundColor(Color.TRANSPARENT)
+            background = mask
+            clipToOutline = true
             addView(image, FrameLayout.LayoutParams(-1, -1))
             addView(gradient, FrameLayout.LayoutParams(-1, -1))
             setOnClickListener { launch(entry) }

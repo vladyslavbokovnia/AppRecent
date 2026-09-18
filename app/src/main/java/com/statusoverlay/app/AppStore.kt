@@ -24,8 +24,9 @@ class AppStore(context: Context) {
     fun setInvertScroll(value: Boolean) = prefs.edit().putBoolean("invert_scroll", value).apply()
     fun iconSize(): Int = prefs.getInt("icon_size", 128)
     fun setIconSize(value: Int) = prefs.edit().putInt("icon_size", value.coerceIn(64, 220)).apply()
-    fun bottomGradientAlpha(): Int = prefs.getInt("bottom_gradient_alpha", 150)
-    fun setBottomGradientAlpha(value: Int) = prefs.edit().putInt("bottom_gradient_alpha", value.coerceIn(0, 255)).apply()
+    fun bottomGradientMode(): Int = prefs.getInt("bottom_gradient_mode", 1).coerceIn(0, 2)
+    fun setBottomGradientMode(value: Int) = prefs.edit().putInt("bottom_gradient_mode", value.coerceIn(0, 2)).apply()
+    fun bottomGradientAlpha(): Int = when (bottomGradientMode()) { 0 -> 0; 1 -> 150; else -> 255 }
     fun activePackage(): String? = prefs.getString("active_package", null)
     fun setActivePackage(packageName: String) = prefs.edit().putString("active_package", packageName).apply()
     fun overrides(): List<String> = prefs.getString("order_overrides", "")!!.split('|').filter(String::isNotBlank)
