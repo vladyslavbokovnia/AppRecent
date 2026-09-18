@@ -55,6 +55,15 @@ class OverlayService : AccessibilityService() {
     private var batteryCharging = false
     private var batteryAnimator: ValueAnimator? = null
     private var edgeHandle: View? = null
+    private val rowSwipeDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(event: MotionEvent) = true
+        override fun onFling(first: MotionEvent?, current: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+            if (!store.expandRows() || kotlin.math.abs(velocityY) < 250f) return false
+            val shouldExpand = velocityY < 0f
+            if (shouldExpand != expandedNow) { expandedNow = shouldExpand; refreshList(false) }
+            return true
+        }
+    })
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: Intent?) {
             val level = intent?.getIntExtra("level", -1) ?: return
@@ -158,7 +167,7 @@ class OverlayService : AccessibilityService() {
     private fun createBatteryOverlay() {
         val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         batteryBar = BatteryBarView(this)
-        val lp = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(6), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, android.graphics.PixelFormat.TRANSLUCENT).apply {
+        val lp = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(4), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, android.graphics.PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.BOTTOM
             y = 0
         }
@@ -168,14 +177,14 @@ class OverlayService : AccessibilityService() {
     private fun updateBatteryAnimation() {
         batteryAnimator?.cancel()
         if (!batteryCharging) {
-            batteryBar?.alpha = 1f
+            batteryBar?.setWhiteAlpha(1f)
             return
         }
         batteryAnimator = ValueAnimator.ofFloat(1f, 0.12f).apply {
             duration = 1400L
             repeatMode = ValueAnimator.REVERSE
             repeatCount = ValueAnimator.INFINITE
-            addUpdateListener { batteryBar?.alpha = it.animatedValue as Float }
+            addUpdateListener { batteryBar?.setWhiteAlpha(it.animatedValue as Float) }
             start()
         }
     }
@@ -183,13 +192,17 @@ class OverlayService : AccessibilityService() {
     private class BatteryBarView(context: android.content.Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private var level = 0f
+        private var whiteAlpha = 1f
         fun setLevel(value: Float) { level = value.coerceIn(0f, 1f); invalidate() }
+        fun setWhiteAlpha(value: Float) { whiteAlpha = value.coerceIn(0f, 1f); invalidate() }
         override fun onDraw(canvas: android.graphics.Canvas) {
             paint.style = Paint.Style.FILL
             paint.color = Color.BLACK
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
             paint.color = Color.WHITE
+            paint.alpha = (whiteAlpha * 255f).toInt()
             canvas.drawRect(0f, 0f, width * level, height.toFloat(), paint)
+            paint.alpha = 255
         }
     }
 
@@ -234,8 +247,9 @@ class OverlayService : AccessibilityService() {
         target.orientation = if (expandedNow) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
         if (expandedNow) {
             val perRow = maxOf(1, resources.displayMetrics.widthPixels / dp(iconSize))
-            display.chunked(perRow).forEach { chunk ->
+            display.chunked(perRow).forEachIndexed { rowIndex, chunk ->
                 val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                if (rowIndex == 0) row.setOnTouchListener { _, event -> rowSwipeDetector.onTouchEvent(event) }
                 chunk.forEach { row.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx)) }
                 target.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, overlayHeightPx))
             }
@@ -244,6 +258,7 @@ class OverlayService : AccessibilityService() {
             resizeOverlay(rows * overlayHeightPx)
         } else {
             display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
+            target.setOnTouchListener { _, event -> rowSwipeDetector.onTouchEvent(event) }
             target.layoutParams = target.layoutParams.apply { height = overlayHeightPx }
             resizeOverlay(overlayHeightPx)
         }
@@ -267,6 +282,7 @@ class OverlayService : AccessibilityService() {
         return AlphaIconView(this, loadIcon(entry.packageName), custom == null, store.bottomGradientAlpha()).apply {
             setOnClickListener { launch(entry) }
             setOnLongClickListener { showMenu(this, entry); true }
+            setOnTouchListener { _, event -> rowSwipeDetector.onTouchEvent(event); false }
             contentDescription = entry.label
         }
     }
