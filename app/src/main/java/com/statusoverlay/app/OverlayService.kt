@@ -3,6 +3,12 @@ package com.statusoverlay.app
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -195,30 +201,29 @@ class OverlayService : AccessibilityService() {
 
     private fun createAppView(entry: AppEntry): View {
         val custom = store.customIcon(entry.packageName)
-        val image = ImageView(this).apply {
-            scaleType = if (custom == null) ImageView.ScaleType.CENTER_CROP else ImageView.ScaleType.FIT_CENTER
-            if (custom == null) setPadding(dp((store.iconSize() * 0.05f).toInt()), (overlayHeightPx * 0.10f).toInt(), dp((store.iconSize() * 0.05f).toInt()), (overlayHeightPx * 0.10f).toInt()) else setPadding(0, 0, 0, 0)
-            contentDescription = entry.label
-            background = ColorDrawable(Color.TRANSPARENT)
-            setImageDrawable(loadIcon(entry.packageName))
-        }
-        val gradient = View(this).apply {
-            isClickable = false
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.TRANSPARENT, Color.argb(store.bottomGradientAlpha(), 0, 0, 0))).apply {
-                cornerRadii = floatArrayOf(0f, 0f, 0f, 0f, dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
-            }
-        }
-        val mask = GradientDrawable().apply {
-            setColor(Color.TRANSPARENT)
-            cornerRadii = floatArrayOf(0f, 0f, 0f, 0f, dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
-        }
-        return FrameLayout(this).apply {
-            background = mask
-            clipToOutline = true
-            addView(image, FrameLayout.LayoutParams(-1, -1))
-            addView(gradient, FrameLayout.LayoutParams(-1, -1))
+        return AlphaIconView(this, loadIcon(entry.packageName), custom == null, store.bottomGradientAlpha()).apply {
             setOnClickListener { launch(entry) }
             setOnLongClickListener { showMenu(this, entry); true }
+            contentDescription = entry.label
+        }
+    }
+
+    private class AlphaIconView(context: android.content.Context, private val icon: Drawable?, private val cropSystemIcon: Boolean, private val fadeAmount: Int) : View(context) {
+        private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
+        override fun onDraw(canvas: android.graphics.Canvas) {
+            super.onDraw(canvas)
+            val radius = 12f * resources.displayMetrics.density
+            val path = android.graphics.Path().apply { addRoundRect(RectF(0f, 0f, width.toFloat(), height.toFloat()), floatArrayOf(0f, 0f, 0f, 0f, radius, radius, radius, radius), android.graphics.Path.Direction.CW) }
+            canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
+            canvas.clipPath(path)
+            val insetX = if (cropSystemIcon) width * .05f else 0f
+            val insetY = if (cropSystemIcon) height * .10f else 0f
+            icon?.setBounds(insetX.toInt(), insetY.toInt(), (width - insetX).toInt(), (height - insetY).toInt())
+            icon?.draw(canvas)
+            maskPaint.shader = LinearGradient(0f, 0f, 0f, height.toFloat(), Color.WHITE, Color.argb(255 - fadeAmount, 255, 255, 255), Shader.TileMode.CLAMP)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), maskPaint)
+            canvas.restore()
         }
     }
 
