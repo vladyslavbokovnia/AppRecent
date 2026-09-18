@@ -22,6 +22,8 @@ class AppStore(context: Context) {
     fun toggleSortMode(): SortMode { val next = if (sortMode() == SortMode.RECENT) SortMode.INSTALL else SortMode.RECENT; setSortMode(next); return next }
     fun invertScroll(): Boolean = prefs.getBoolean("invert_scroll", false)
     fun setInvertScroll(value: Boolean) = prefs.edit().putBoolean("invert_scroll", value).apply()
+    fun expandRows(): Boolean = prefs.getBoolean("expand_rows", false)
+    fun setExpandRows(value: Boolean) = prefs.edit().putBoolean("expand_rows", value).apply()
     fun iconSize(): Int = prefs.getInt("icon_size", 128)
     fun setIconSize(value: Int) = prefs.edit().putInt("icon_size", value.coerceIn(64, 220)).apply()
     fun bottomGradientAlpha(): Int = prefs.getInt("bottom_gradient_alpha", 128).coerceIn(0, 255)

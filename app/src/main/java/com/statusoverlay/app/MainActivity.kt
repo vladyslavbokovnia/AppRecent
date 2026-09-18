@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable private fun SettingsScreen() {
         val currentTick = resumeTick
-        var render by remember { mutableStateOf(store.renderMode()) }; var sort by remember { mutableStateOf(store.sortMode()) }; var invert by remember { mutableStateOf(store.invertScroll()) }; var iconSize by remember { mutableStateOf(store.iconSize().toFloat()) }; var gradientAlpha by remember { mutableStateOf(store.bottomGradientAlpha().toFloat()) }
+        var render by remember { mutableStateOf(store.renderMode()) }; var sort by remember { mutableStateOf(store.sortMode()) }; var invert by remember { mutableStateOf(store.invertScroll()) }; var expandRows by remember { mutableStateOf(store.expandRows()) }; var iconSize by remember { mutableStateOf(store.iconSize().toFloat()) }; var gradientAlpha by remember { mutableStateOf(store.bottomGradientAlpha().toFloat()) }
         var hidden by remember(currentTick) { mutableStateOf(repository.hiddenEntries()) }
         MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF10131A), surface = Color(0xFF191E28), primary = Color(0xFF9DB7FF))) {
             Scaffold(topBar = { TopAppBar(title = { Text("AppRecent") }, navigationIcon = { androidx.compose.material3.Icon(Icons.Default.Settings, "Настройки") }) }) { pad ->
@@ -72,9 +72,10 @@ class MainActivity : ComponentActivity() {
                         Choice(Icons.Default.ViewCarousel, "Постраничный", render == RenderMode.PAGED) { render = RenderMode.PAGED; store.setRenderMode(render) }
                         Choice(Icons.Default.Swipe, "Плавная прокрутка с анимацией", render == RenderMode.SMOOTH) { render = RenderMode.SMOOTH; store.setRenderMode(render) }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Инвертировать прокрутку по краю"); Switch(checked = invert, onCheckedChange = { invert = it; store.setInvertScroll(it) }) }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Раскрывать панель построчно"); Switch(checked = expandRows, onCheckedChange = { expandRows = it; store.setExpandRows(it) }) }
                     } }
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Choice(Icons.Default.Settings, "Размер иконок: ${iconSize.toInt()} dp", false) { }
+                        Text("Размер иконок: ${iconSize.toInt()} dp", style = MaterialTheme.typography.titleSmall)
                         Slider(value = iconSize, onValueChange = { iconSize = it; store.setIconSize(it.toInt()) }, valueRange = 64f..220f, steps = 15)
                         Text("Изменение применяется к панели после обновления списка.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("Прозрачность нижнего градиента: ${gradientAlpha.toInt()}", style = MaterialTheme.typography.titleSmall)

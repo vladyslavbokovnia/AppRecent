@@ -50,6 +50,7 @@ class OverlayService : AccessibilityService() {
     private var overlayHeightPx = 128
     private var renderedIconSize = -1
     private var renderedGradientAlpha = -1
+    private var expandedNow = false
     private var batteryBar: BatteryBarView? = null
     private var batteryCharging = false
     private var batteryAnimator: ValueAnimator? = null
@@ -76,6 +77,7 @@ class OverlayService : AccessibilityService() {
             store = AppStore(this)
             repository = AppRepository(this, store)
             active = true
+            expandedNow = store.expandRows()
             createOverlay()
             createBatteryOverlay()
             createEdgeHandle()
@@ -156,7 +158,7 @@ class OverlayService : AccessibilityService() {
     private fun createBatteryOverlay() {
         val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         batteryBar = BatteryBarView(this)
-        val lp = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(2), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, android.graphics.PixelFormat.TRANSLUCENT).apply {
+        val lp = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, dp(6), WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, android.graphics.PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.BOTTOM
             y = 0
         }
@@ -208,7 +210,10 @@ class OverlayService : AccessibilityService() {
     }
 
     private fun toggleVisibility() {
-        root?.let { view -> view.visibility = if (view.visibility == View.VISIBLE) View.GONE else View.VISIBLE; if (view.visibility == View.VISIBLE) refreshList(true) }
+        root?.let { view ->
+            view.visibility = if (view.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            if (view.visibility == View.VISIBLE) { expandedNow = store.expandRows(); refreshList(true) }
+        }
     }
 
     private fun refreshList(scrollToEnd: Boolean) {
@@ -226,7 +231,22 @@ class OverlayService : AccessibilityService() {
         pageCount = 1
         page = 0
         val display = entries
-        display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
+        target.orientation = if (expandedNow) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+        if (expandedNow) {
+            val perRow = maxOf(1, resources.displayMetrics.widthPixels / dp(iconSize))
+            display.chunked(perRow).forEach { chunk ->
+                val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                chunk.forEach { row.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx)) }
+                target.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, overlayHeightPx))
+            }
+            val rows = maxOf(1, (display.size + perRow - 1) / perRow)
+            target.layoutParams = target.layoutParams.apply { height = rows * overlayHeightPx }
+            resizeOverlay(rows * overlayHeightPx)
+        } else {
+            display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
+            target.layoutParams = target.layoutParams.apply { height = overlayHeightPx }
+            resizeOverlay(overlayHeightPx)
+        }
         renderedIconSize = iconSize
         renderedGradientAlpha = gradientAlpha
         pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
@@ -234,6 +254,12 @@ class OverlayService : AccessibilityService() {
             val destination = scroll?.getChildAt(0)?.width ?: 0
             if (store.renderMode() == RenderMode.SMOOTH) scroll?.smoothScrollTo(destination, 0) else scroll?.scrollTo(destination, 0)
         }
+    }
+
+    private fun resizeOverlay(height: Int) {
+        scroll?.layoutParams = scroll?.layoutParams?.apply { this.height = height }
+        root?.layoutParams = root?.layoutParams?.apply { this.height = height }
+        root?.let { runCatching { windowManager.updateViewLayout(it, it.layoutParams) } }
     }
 
     private fun createAppView(entry: AppEntry): View {
@@ -289,6 +315,7 @@ class OverlayService : AccessibilityService() {
     }
 
     private fun launch(entry: AppEntry) {
+        expandedNow = false
         store.launched(entry.packageName)
         packageManager.getLaunchIntentForPackage(entry.packageName)?.also { it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(it) }
         handler.postDelayed({ page = 0; refreshList(true) }, 250L)
