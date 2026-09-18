@@ -62,15 +62,15 @@ class MainActivity : ComponentActivity() {
         MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF10131A), surface = Color(0xFF191E28), primary = Color(0xFF9DB7FF))) {
             Scaffold(topBar = { TopAppBar(title = { Text("AppRecent") }, navigationIcon = { androidx.compose.material3.Icon(Icons.Default.Settings, "Настройки") }) }) { pad ->
                 Column(Modifier.fillMaxSize().padding(pad).padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("Панель быстрого запуска", style = MaterialTheme.typography.headlineSmall); Text("Настройте отображение приложений и плавность прокрутки.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Панель быстрого запуска", style = MaterialTheme.typography.headlineSmall); Text("Настройте отображение приложений и способ прокрутки.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     PermissionCard("Наложение поверх других приложений", Settings.canDrawOverlays(this@MainActivity)) { open(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")) }
                     PermissionCard("Статистика использования", usageGranted()) { open(Settings.ACTION_USAGE_ACCESS_SETTINGS) }
                     PermissionCard("Служба специальных возможностей", accessibilityGranted()) { open(Settings.ACTION_ACCESSIBILITY_SETTINGS) }
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Способ рендеринга прокрутки", style = MaterialTheme.typography.titleMedium)
                         Choice(Icons.Default.ViewModule, "Все видимые на экране", render == RenderMode.VISIBLE) { render = RenderMode.VISIBLE; store.setRenderMode(render) }
-                        Choice(Icons.Default.ViewCarousel, "Постраничный", render == RenderMode.PAGED) { render = RenderMode.PAGED; store.setRenderMode(render) }
-                        Choice(Icons.Default.Swipe, "Плавная прокрутка с анимацией", render == RenderMode.SMOOTH) { render = RenderMode.SMOOTH; store.setRenderMode(render) }
+                        Choice(Icons.Default.ViewCarousel, "Постраничная прокрутка", render == RenderMode.PAGED) { render = RenderMode.PAGED; store.setRenderMode(render) }
+                        Choice(Icons.Default.Swipe, "Плавная прокрутка", render == RenderMode.SMOOTH) { render = RenderMode.SMOOTH; store.setRenderMode(render) }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Инвертировать прокрутку по краю"); Switch(checked = invert, onCheckedChange = { invert = it; store.setInvertScroll(it) }) }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Раскрывать панель построчно"); Switch(checked = expandRows, onCheckedChange = { expandRows = it; store.setExpandRows(it) }) }
                     } }

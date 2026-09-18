@@ -55,6 +55,7 @@ class OverlayService : AccessibilityService() {
     private var batteryCharging = false
     private var batteryAnimator: ValueAnimator? = null
     private var edgeHandle: View? = null
+    private lateinit var rowSwipeDetector: GestureDetector
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: Intent?) {
             val level = intent?.getIntExtra("level", -1) ?: return
@@ -116,6 +117,18 @@ class OverlayService : AccessibilityService() {
     private fun createOverlay() {
         val overlayHeight = statusBarHeightPx()
         overlayHeightPx = overlayHeight
+        rowSwipeDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(event: MotionEvent) = true
+            override fun onFling(first: MotionEvent?, current: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (!store.expandRows() || kotlin.math.abs(velocityY) < dp(80).toFloat()) return false
+                val next = velocityY < 0f
+                if (next != expandedNow) {
+                    expandedNow = next
+                    refreshList(false)
+                }
+                return true
+            }
+        })
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -216,7 +229,7 @@ class OverlayService : AccessibilityService() {
     private fun toggleVisibility() {
         root?.let { view ->
             view.visibility = if (view.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            if (view.visibility == View.VISIBLE) { expandedNow = store.expandRows(); refreshList(true) }
+            if (view.visibility == View.VISIBLE) { expandedNow = false; refreshList(true) }
         }
     }
 
@@ -244,8 +257,10 @@ class OverlayService : AccessibilityService() {
                 target.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, overlayHeightPx))
             }
             val rows = maxOf(1, (display.size + perRow - 1) / perRow)
+            val maxRows = maxOf(1, (resources.displayMetrics.heightPixels / 2) / overlayHeightPx)
+            val visibleHeight = minOf(rows, maxRows) * overlayHeightPx
             target.layoutParams = target.layoutParams.apply { height = rows * overlayHeightPx }
-            resizeOverlay(rows * overlayHeightPx)
+            resizeOverlay(visibleHeight)
         } else {
             display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
             target.layoutParams = target.layoutParams.apply { height = overlayHeightPx }
@@ -271,6 +286,7 @@ class OverlayService : AccessibilityService() {
         return AlphaIconView(this, loadIcon(entry.packageName), custom == null, store.bottomGradientAlpha()).apply {
             setOnClickListener { launch(entry) }
             setOnLongClickListener { showMenu(this, entry); true }
+            setOnTouchListener { _, event -> rowSwipeDetector.onTouchEvent(event); false }
             contentDescription = entry.label
         }
     }
