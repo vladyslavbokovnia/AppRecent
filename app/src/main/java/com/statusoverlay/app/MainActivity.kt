@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
                         Choice(Icons.Default.ViewCarousel, "Постраничная прокрутка", render == RenderMode.PAGED) { render = RenderMode.PAGED; store.setRenderMode(render) }
                         Choice(Icons.Default.Swipe, "Плавная прокрутка", render == RenderMode.SMOOTH) { render = RenderMode.SMOOTH; store.setRenderMode(render) }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Инвертировать прокрутку по краю"); Switch(checked = invert, onCheckedChange = { invert = it; store.setInvertScroll(it) }) }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Раскрывать панель построчно"); Switch(checked = expandRows, onCheckedChange = { expandRows = it; store.setExpandRows(it) }) }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text("Выдвигать панель свайпом вниз"); Switch(checked = expandRows, onCheckedChange = { expandRows = it; store.setExpandRows(it) }) }
                     } }
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Размер иконок: ${iconSize.toInt()} dp", style = MaterialTheme.typography.titleSmall)
