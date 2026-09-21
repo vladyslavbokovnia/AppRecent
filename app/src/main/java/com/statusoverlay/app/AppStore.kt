@@ -28,6 +28,8 @@ class AppStore(context: Context) {
     fun setIconSize(value: Int) = prefs.edit().putInt("icon_size", value.coerceIn(64, 220)).apply()
     fun bottomGradientAlpha(): Int = prefs.getInt("bottom_gradient_alpha", 128).coerceIn(0, 255)
     fun setBottomGradientAlpha(value: Int) = prefs.edit().putInt("bottom_gradient_alpha", value.coerceIn(0, 255)).apply()
+    fun expandedBackgroundAlpha(): Int = prefs.getInt("expanded_bg_alpha", 160).coerceIn(0, 255)
+    fun setExpandedBackgroundAlpha(value: Int) = prefs.edit().putInt("expanded_bg_alpha", value.coerceIn(0, 255)).apply()
     fun activePackage(): String? = prefs.getString("active_package", null)
     fun setActivePackage(packageName: String) = prefs.edit().putString("active_package", packageName).apply()
     fun overrides(): List<String> = prefs.getString("order_overrides", "")!!.split('|').filter(String::isNotBlank)
