@@ -28,7 +28,7 @@ class AppRepository(private val context: Context, private val store: AppStore = 
         }.getOrNull() }
         val sorted = when (store.sortMode()) {
             SortMode.INSTALL -> result.sortedWith(compareByDescending<AppEntry> { it.installTime }.thenBy { it.label.lowercase() })
-            SortMode.RECENT -> result.sortedWith(compareBy<AppEntry> { it.lastUsed }.thenBy { it.label.lowercase() })
+            SortMode.RECENT -> result.sortedWith(compareByDescending<AppEntry> { it.lastUsed }.thenBy { it.label.lowercase() })
         }
         return sorted
     }

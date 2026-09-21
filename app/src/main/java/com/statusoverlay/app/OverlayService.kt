@@ -35,12 +35,16 @@ import android.os.SystemClock
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.os.BatteryManager
+import java.util.concurrent.Executors
 
 class OverlayService : AccessibilityService() {
     private lateinit var windowManager: WindowManager
     private lateinit var store: AppStore
     private lateinit var repository: AppRepository
     private val handler = Handler(Looper.getMainLooper())
+    private val bgExecutor = Executors.newSingleThreadExecutor()
+    private var refreshGeneration = 0
+    private val iconCache = android.util.LruCache<String, Drawable.ConstantState>(300)
     private var root: PullLayout? = null
     private var scroll: HorizontalScrollView? = null
     private var content: LinearLayout? = null
@@ -107,6 +111,7 @@ class OverlayService : AccessibilityService() {
     override fun onDestroy() {
         active = false
         handler.removeCallbacksAndMessages(null)
+        bgExecutor.shutdownNow()
         runCatching { unregisterReceiver(batteryReceiver) }
         root?.let { runCatching { windowManager.removeView(it) } }
         batteryBar?.let { runCatching { windowManager.removeView(it) } }
@@ -237,8 +242,23 @@ class OverlayService : AccessibilityService() {
 
     private fun refreshList(scrollToEnd: Boolean) {
         if (!active) return
+        val generation = ++refreshGeneration
+        bgExecutor.execute {
+            val loaded = runCatching { repository.load() }.getOrDefault(emptyList())
+            loaded.forEach { entry ->
+                if (iconCache.get(entry.packageName) == null && store.customIcon(entry.packageName) == null) {
+                    runCatching { iconCache.put(entry.packageName, packageManager.getApplicationIcon(entry.packageName).constantState) }
+                }
+            }
+            handler.post {
+                if (!active || generation != refreshGeneration) return@post
+                applyList(loaded, scrollToEnd)
+            }
+        }
+    }
+
+    private fun applyList(loaded: List<AppEntry>, scrollToEnd: Boolean) {
         val oldPackages = entries.map { it.packageName }
-        val loaded = runCatching { repository.load() }.getOrDefault(emptyList())
         entries = loaded
         val target = content ?: return
         val newPackages = loaded.map { it.packageName }
@@ -275,9 +295,8 @@ class OverlayService : AccessibilityService() {
         renderedGradientAlpha = gradientAlpha
         renderedExpanded = expandedNow
         pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
-        if (scrollToEnd && !paged) scroll?.post {
-            val destination = scroll?.getChildAt(0)?.width ?: 0
-            if (store.renderMode() == RenderMode.SMOOTH) scroll?.smoothScrollTo(destination, 0) else scroll?.scrollTo(destination, 0)
+        if (scrollToEnd && !paged && !expandedNow) scroll?.post {
+            if (store.renderMode() == RenderMode.SMOOTH) scroll?.smoothScrollTo(0, 0) else scroll?.scrollTo(0, 0)
         }
     }
 
@@ -353,7 +372,8 @@ class OverlayService : AccessibilityService() {
 
     private fun loadIcon(packageName: String): Drawable? = runCatching {
         val custom = store.customIcon(packageName)
-        if (custom == null) packageManager.getApplicationIcon(packageName) else contentResolver.openInputStream(Uri.parse(custom)).use { Drawable.createFromStream(it, custom) }
+        if (custom != null) return@runCatching contentResolver.openInputStream(Uri.parse(custom)).use { Drawable.createFromStream(it, custom) }
+        iconCache.get(packageName)?.newDrawable(resources) ?: packageManager.getApplicationIcon(packageName).also { iconCache.put(packageName, it.constantState) }
     }.getOrNull()
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
     private val refreshFromEvent = Runnable { page = 0; refreshList(true) }
