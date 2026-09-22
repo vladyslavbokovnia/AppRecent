@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable private fun SettingsScreen() {
         val currentTick = resumeTick
-        var render by remember { mutableStateOf(store.renderMode()) }; var sort by remember { mutableStateOf(store.sortMode()) }; var invert by remember { mutableStateOf(store.invertScroll()) }; var expandRows by remember { mutableStateOf(store.expandRows()) }; var iconSize by remember { mutableStateOf(store.iconSize().toFloat()) }; var gradientAlpha by remember { mutableStateOf(store.bottomGradientAlpha().toFloat()) }; var expandedBgAlpha by remember { mutableStateOf(store.expandedBackgroundAlpha().toFloat()) }
+        var render by remember { mutableStateOf(store.renderMode()) }; var sort by remember { mutableStateOf(store.sortMode()) }; var invert by remember { mutableStateOf(store.invertScroll()) }; var expandRows by remember { mutableStateOf(store.expandRows()) }; var iconSize by remember { mutableStateOf(store.iconSize().toFloat()) }; var gradientAlpha by remember { mutableStateOf(store.bottomGradientAlpha().toFloat()) }; var expandedBgAlpha by remember { mutableStateOf(store.expandedBackgroundAlpha().toFloat()) }; var iconAlpha by remember { mutableStateOf(store.iconAlpha().toFloat()) }
         var hidden by remember(currentTick) { mutableStateOf(repository.hiddenEntries()) }
         MaterialTheme(colorScheme = darkColorScheme(background = Color(0xFF10131A), surface = Color(0xFF191E28), primary = Color(0xFF9DB7FF))) {
             Scaffold(topBar = { TopAppBar(title = { Text("AppRecent") }, navigationIcon = { androidx.compose.material3.Icon(Icons.Default.Settings, "Настройки") }) }) { pad ->
@@ -84,6 +84,9 @@ class MainActivity : ComponentActivity() {
                         Text("Прозрачность фона развёрнутой панели: ${expandedBgAlpha.toInt()}", style = MaterialTheme.typography.titleSmall)
                         Slider(value = expandedBgAlpha, onValueChange = { expandedBgAlpha = it; store.setExpandedBackgroundAlpha(it.toInt()) }, valueRange = 0f..255f, steps = 15)
                         Text("0 — полностью прозрачный фон, 255 — сплошной чёрный фон под раскрытой панелью", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Прозрачность иконок: ${iconAlpha.toInt()}", style = MaterialTheme.typography.titleSmall)
+                        Slider(value = iconAlpha, onValueChange = { iconAlpha = it; store.setIconAlpha(it.toInt()) }, valueRange = 30f..255f, steps = 15)
+                        Text("Влияет на все значки во всех режимах панели", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } }
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Скрытые приложения", style = MaterialTheme.typography.titleMedium)

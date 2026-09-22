@@ -47,6 +47,7 @@ class OverlayService : AccessibilityService() {
     private val iconCache = android.util.LruCache<String, Drawable.ConstantState>(300)
     private var root: PullLayout? = null
     private var scroll: HorizontalScrollView? = null
+    private var vScroll: ScrollView? = null
     private var content: LinearLayout? = null
     private var entries: List<AppEntry> = emptyList()
     private var active = false
@@ -134,7 +135,6 @@ class OverlayService : AccessibilityService() {
         ).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.TOP
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(0, 0, 0, 0)
         }
@@ -142,13 +142,11 @@ class OverlayService : AccessibilityService() {
             isHorizontalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
             isSmoothScrollingEnabled = true
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             setBackgroundColor(Color.TRANSPARENT)
         }
         val items = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
         }
         val vertical = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
@@ -160,6 +158,7 @@ class OverlayService : AccessibilityService() {
         panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
         root = panel
         scroll = horizontal
+        vScroll = vertical
         content = items
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -224,7 +223,9 @@ class OverlayService : AccessibilityService() {
             override fun onDown(event: MotionEvent) = true
             override fun onSingleTapUp(event: MotionEvent): Boolean { toggleVisibility(); return true }
             override fun onScroll(first: MotionEvent?, current: MotionEvent, dx: Float, dy: Float): Boolean {
-                if (root?.visibility == View.VISIBLE) scroll?.scrollBy(if (store.invertScroll()) dy.toInt() * 2 else -dy.toInt() * 2, 0)
+                if (root?.visibility != View.VISIBLE) return true
+                if (expandedNow) vScroll?.scrollBy(0, if (store.invertScroll()) -dy.toInt() * 2 else dy.toInt() * 2)
+                else scroll?.scrollBy(if (store.invertScroll()) dy.toInt() * 2 else -dy.toInt() * 2, 0)
                 return true
             }
         })
@@ -279,19 +280,21 @@ class OverlayService : AccessibilityService() {
         val display = entries
         target.orientation = if (expandedNow) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
         if (expandedNow) {
-            val perRow = maxOf(1, resources.displayMetrics.widthPixels / dp(iconSize))
-            display.chunked(perRow).forEachIndexed { rowIndex, chunk ->
-                noFade = (rowIndex + 1) * perRow < entries.size
-                val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-                chunk.forEach { row.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx)) }
-                target.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, overlayHeightPx))
+            val perRow = 3
+            val rowHeight = dp(iconSize)
+            val ordered = display.reversed()
+            ordered.chunked(perRow).forEachIndexed { rowIndex, chunk ->
+                noFade = (rowIndex + 1) * perRow < ordered.size
+                val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; weightSum = perRow.toFloat() }
+                chunk.forEach { row.addView(createAppView(it), LinearLayout.LayoutParams(0, rowHeight, 1f)) }
+                target.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, rowHeight))
             }
             target.setBackgroundColor(Color.argb(store.expandedBackgroundAlpha(), 0, 0, 0))
             noFade = false
-            val rows = maxOf(1, (display.size + perRow - 1) / perRow)
-            val maxRows = maxOf(1, (resources.displayMetrics.heightPixels / 2) / overlayHeightPx)
-            val visibleHeight = minOf(rows, maxRows) * overlayHeightPx
-            target.layoutParams = target.layoutParams.apply { height = rows * overlayHeightPx }
+            val rows = maxOf(1, (ordered.size + perRow - 1) / perRow)
+            val maxRows = maxOf(1, (resources.displayMetrics.heightPixels / 2) / rowHeight)
+            val visibleHeight = minOf(rows, maxRows) * rowHeight
+            target.layoutParams = target.layoutParams.apply { height = rows * rowHeight }
             resizeOverlay(visibleHeight)
         } else {
             target.setBackgroundColor(Color.TRANSPARENT)
@@ -319,21 +322,20 @@ class OverlayService : AccessibilityService() {
     private fun createAppView(entry: AppEntry): View {
         val custom = store.customIcon(entry.packageName)
         val fade = if (noFade) 0 else store.bottomGradientAlpha()
-        return AlphaIconView(this, loadIcon(entry.packageName), custom == null, fade).apply {
+        return AlphaIconView(this, loadIcon(entry.packageName), custom == null, fade, store.iconAlpha()).apply {
             setOnClickListener { launch(entry) }
             setOnLongClickListener { showMenu(this, entry); true }
             contentDescription = entry.label
         }
     }
 
-    private class AlphaIconView(context: android.content.Context, private val icon: Drawable?, private val cropSystemIcon: Boolean, private val fadeAmount: Int) : View(context) {
+    private class AlphaIconView(context: android.content.Context, private val icon: Drawable?, private val cropSystemIcon: Boolean, private val fadeAmount: Int, private val overallAlpha: Int) : View(context) {
         private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
+        private val layerPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         override fun onDraw(canvas: android.graphics.Canvas) {
             super.onDraw(canvas)
             val radius = 12f * resources.displayMetrics.density
             val path = android.graphics.Path().apply { addRoundRect(RectF(0f, 0f, width.toFloat(), height.toFloat()), floatArrayOf(0f, 0f, 0f, 0f, radius, radius, radius, radius), android.graphics.Path.Direction.CW) }
-            canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
-            canvas.clipPath(path)
             val boxW = if (cropSystemIcon) width / .80f else width.toFloat()
             val boxH = height.toFloat()
             val iw = icon?.intrinsicWidth?.takeIf { it > 0 }?.toFloat() ?: boxW
@@ -344,10 +346,22 @@ class OverlayService : AccessibilityService() {
             val left = (width - drawW) / 2f
             val top = (height - drawH) / 2f
             icon?.setBounds(left.toInt(), top.toInt(), (left + drawW).toInt(), (top + drawH).toInt())
-            icon?.draw(canvas)
-            maskPaint.shader = LinearGradient(0f, 0f, 0f, height.toFloat(), Color.WHITE, Color.argb(255 - fadeAmount, 255, 255, 255), Shader.TileMode.CLAMP)
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), maskPaint)
-            canvas.restore()
+            if (fadeAmount == 0) {
+                canvas.save()
+                canvas.clipPath(path)
+                icon?.alpha = overallAlpha
+                icon?.draw(canvas)
+                canvas.restore()
+            } else {
+                layerPaint.alpha = overallAlpha
+                canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), layerPaint)
+                canvas.clipPath(path)
+                icon?.alpha = 255
+                icon?.draw(canvas)
+                maskPaint.shader = LinearGradient(0f, 0f, 0f, height.toFloat(), Color.WHITE, Color.argb(255 - fadeAmount, 255, 255, 255), Shader.TileMode.CLAMP)
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), maskPaint)
+                canvas.restore()
+            }
         }
     }
 
