@@ -124,14 +124,15 @@ class OverlayService : AccessibilityService() {
     private fun createOverlay() {
         val overlayHeight = statusBarHeightPx()
         overlayHeightPx = overlayHeight
-        // Keep a larger touch-catching window while collapsed, as in the version
-        // where pull-down expansion was working reliably.
-        val collapsedWindowHeight = maxOf(overlayHeight * 3, dp(160))
+        val collapsedWindowHeight = pullCatchHeightPx(overlayHeight)
         val panel = PullLayout(
             this,
             pullEnabled = { store.expandRows() },
             isExpanded = { expandedNow },
-            onPull = { expand -> toggleExpand(expand) }
+            onPull = { expand ->
+                expandedNow = expand
+                refreshList(false)
+            }
         ).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.TOP
@@ -154,11 +155,10 @@ class OverlayService : AccessibilityService() {
         val vertical = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
-            // Must follow the resized overlay when the panel expands.
-            addView(items, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(items, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, overlayHeight))
         }
-        horizontal.addView(vertical, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        horizontal.addView(vertical, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, overlayHeight))
         root = panel
         scroll = horizontal
         content = items
@@ -259,12 +259,6 @@ class OverlayService : AccessibilityService() {
         }
     }
 
-    private fun toggleExpand(expand: Boolean) {
-        if (!active) return
-        expandedNow = expand
-        applyList(entries, false)
-    }
-
     private fun applyList(loaded: List<AppEntry>, scrollToEnd: Boolean) {
         val oldPackages = entries.map { it.packageName }
         entries = loaded
@@ -299,7 +293,8 @@ class OverlayService : AccessibilityService() {
             noFade = false
             display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
             target.layoutParams = target.layoutParams.apply { height = overlayHeightPx }
-            resizeOverlay(overlayHeightPx)
+            scroll?.layoutParams = scroll?.layoutParams?.apply { this.height = overlayHeightPx }
+            resizeOverlayWindow(pullCatchHeightPx(overlayHeightPx))
         }
         renderedIconSize = iconSize
         renderedGradientAlpha = gradientAlpha
@@ -313,6 +308,11 @@ class OverlayService : AccessibilityService() {
 
     private fun resizeOverlay(height: Int) {
         scroll?.layoutParams = scroll?.layoutParams?.apply { this.height = height }
+        root?.layoutParams = root?.layoutParams?.apply { this.height = height }
+        root?.let { runCatching { windowManager.updateViewLayout(it, it.layoutParams) } }
+    }
+
+    private fun resizeOverlayWindow(height: Int) {
         root?.layoutParams = root?.layoutParams?.apply { this.height = height }
         root?.let { runCatching { windowManager.updateViewLayout(it, it.layoutParams) } }
     }
@@ -387,6 +387,7 @@ class OverlayService : AccessibilityService() {
         iconCache.get(packageName)?.newDrawable(resources) ?: packageManager.getApplicationIcon(packageName).also { iconCache.put(packageName, it.constantState) }
     }.getOrNull()
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
+    private fun pullCatchHeightPx(base: Int): Int = maxOf(base * 3, dp(160))
     private val refreshFromEvent = Runnable { page = 0; refreshList(true) }
     private fun packageNameOfSelf(): String = applicationContext.packageName
 }
