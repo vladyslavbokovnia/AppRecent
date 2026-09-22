@@ -124,18 +124,14 @@ class OverlayService : AccessibilityService() {
     private fun createOverlay() {
         val overlayHeight = statusBarHeightPx()
         overlayHeightPx = overlayHeight
-        val collapsedWindowHeight = pullCatchHeightPx(overlayHeight)
         val panel = PullLayout(
             this,
             pullEnabled = { store.expandRows() },
             isExpanded = { expandedNow },
-            onPull = { expand ->
-                expandedNow = expand
-                refreshList(false)
-            }
+            onPull = { expand -> toggleExpand(expand) }
         ).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.TOP
+            gravity = Gravity.CENTER_VERTICAL
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(0, 0, 0, 0)
@@ -164,7 +160,7 @@ class OverlayService : AccessibilityService() {
         content = items
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            collapsedWindowHeight,
+            overlayHeight,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             android.graphics.PixelFormat.TRANSLUCENT
@@ -259,6 +255,12 @@ class OverlayService : AccessibilityService() {
         }
     }
 
+    private fun toggleExpand(expand: Boolean) {
+        if (!active) return
+        expandedNow = expand
+        applyList(entries, false)
+    }
+
     private fun applyList(loaded: List<AppEntry>, scrollToEnd: Boolean) {
         val oldPackages = entries.map { it.packageName }
         entries = loaded
@@ -293,8 +295,7 @@ class OverlayService : AccessibilityService() {
             noFade = false
             display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
             target.layoutParams = target.layoutParams.apply { height = overlayHeightPx }
-            scroll?.layoutParams = scroll?.layoutParams?.apply { this.height = overlayHeightPx }
-            resizeOverlayWindow(pullCatchHeightPx(overlayHeightPx))
+            resizeOverlay(overlayHeightPx)
         }
         renderedIconSize = iconSize
         renderedGradientAlpha = gradientAlpha
@@ -308,11 +309,6 @@ class OverlayService : AccessibilityService() {
 
     private fun resizeOverlay(height: Int) {
         scroll?.layoutParams = scroll?.layoutParams?.apply { this.height = height }
-        root?.layoutParams = root?.layoutParams?.apply { this.height = height }
-        root?.let { runCatching { windowManager.updateViewLayout(it, it.layoutParams) } }
-    }
-
-    private fun resizeOverlayWindow(height: Int) {
         root?.layoutParams = root?.layoutParams?.apply { this.height = height }
         root?.let { runCatching { windowManager.updateViewLayout(it, it.layoutParams) } }
     }
@@ -387,7 +383,6 @@ class OverlayService : AccessibilityService() {
         iconCache.get(packageName)?.newDrawable(resources) ?: packageManager.getApplicationIcon(packageName).also { iconCache.put(packageName, it.constantState) }
     }.getOrNull()
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
-    private fun pullCatchHeightPx(base: Int): Int = maxOf(base * 3, dp(160))
     private val refreshFromEvent = Runnable { page = 0; refreshList(true) }
     private fun packageNameOfSelf(): String = applicationContext.packageName
 }
