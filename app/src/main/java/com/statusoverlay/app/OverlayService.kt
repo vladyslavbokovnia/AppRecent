@@ -124,6 +124,9 @@ class OverlayService : AccessibilityService() {
     private fun createOverlay() {
         val overlayHeight = statusBarHeightPx()
         overlayHeightPx = overlayHeight
+        // Keep a larger touch-catching window while collapsed, as in the version
+        // where pull-down expansion was working reliably.
+        val collapsedWindowHeight = maxOf(overlayHeight * 3, dp(160))
         val panel = PullLayout(
             this,
             pullEnabled = { store.expandRows() },
@@ -131,7 +134,7 @@ class OverlayService : AccessibilityService() {
             onPull = { expand -> toggleExpand(expand) }
         ).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.TOP
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(0, 0, 0, 0)
@@ -151,16 +154,17 @@ class OverlayService : AccessibilityService() {
         val vertical = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
-            addView(items, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, overlayHeight))
+            // Must follow the resized overlay when the panel expands.
+            addView(items, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
-        horizontal.addView(vertical, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, overlayHeight))
+        horizontal.addView(vertical, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        panel.addView(horizontal, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         root = panel
         scroll = horizontal
         content = items
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            overlayHeight,
+            collapsedWindowHeight,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             android.graphics.PixelFormat.TRANSLUCENT
