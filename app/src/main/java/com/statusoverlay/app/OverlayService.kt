@@ -59,6 +59,7 @@ class OverlayService : AccessibilityService() {
     private var renderedGradientAlpha = -1
     private var renderedExpanded = false
     private var renderedExpandedBgAlpha = -1
+    private var renderedIconAlpha = -1
     private var expandedNow = false
     private var noFade = false
     private var batteryBar: BatteryBarView? = null
@@ -263,6 +264,7 @@ class OverlayService : AccessibilityService() {
         if (!active) return
         expandedNow = expand
         applyList(entries, false)
+        if (expand) vScroll?.post { vScroll?.fullScroll(View.FOCUS_DOWN) }
     }
 
     private fun applyList(loaded: List<AppEntry>, scrollToEnd: Boolean) {
@@ -272,7 +274,7 @@ class OverlayService : AccessibilityService() {
         val newPackages = loaded.map { it.packageName }
         val iconSize = store.iconSize()
         val gradientAlpha = store.bottomGradientAlpha()
-        if (newPackages == oldPackages && iconSize == renderedIconSize && gradientAlpha == renderedGradientAlpha && expandedNow == renderedExpanded && store.expandedBackgroundAlpha() == renderedExpandedBgAlpha) return
+        if (newPackages == oldPackages && iconSize == renderedIconSize && gradientAlpha == renderedGradientAlpha && expandedNow == renderedExpanded && store.expandedBackgroundAlpha() == renderedExpandedBgAlpha && store.iconAlpha() == renderedIconAlpha) return
         target.removeAllViews()
         val paged = false
         pageCount = 1
@@ -307,13 +309,14 @@ class OverlayService : AccessibilityService() {
             target.setBackgroundColor(Color.TRANSPARENT)
             noFade = false
             display.forEach { target.addView(createAppView(it), LinearLayout.LayoutParams(dp(iconSize), overlayHeightPx).apply { leftMargin = 0; rightMargin = 0; topMargin = 0; bottomMargin = 0 }) }
-            target.layoutParams = target.layoutParams.apply { height = overlayHeightPx }
+            target.layoutParams = target.layoutParams.apply { width = ViewGroup.LayoutParams.WRAP_CONTENT; height = overlayHeightPx }
             resizeOverlay(overlayHeightPx)
         }
         renderedIconSize = iconSize
         renderedGradientAlpha = gradientAlpha
         renderedExpanded = expandedNow
         renderedExpandedBgAlpha = store.expandedBackgroundAlpha()
+        renderedIconAlpha = store.iconAlpha()
         pageIndicator?.text = if (paged) "${page + 1}/$pageCount" else "•"
         if (scrollToEnd && !paged && !expandedNow) scroll?.post {
             if (store.renderMode() == RenderMode.SMOOTH) scroll?.smoothScrollTo(0, 0) else scroll?.scrollTo(0, 0)
