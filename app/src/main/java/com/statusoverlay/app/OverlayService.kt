@@ -281,20 +281,27 @@ class OverlayService : AccessibilityService() {
         target.orientation = if (expandedNow) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
         if (expandedNow) {
             val perRow = 3
+            val screenWidth = resources.displayMetrics.widthPixels
+            val baseColWidth = screenWidth / perRow
+            val colWidths = IntArray(perRow) { i ->
+                if (i == perRow - 1) screenWidth - baseColWidth * (perRow - 1) else baseColWidth
+            }
             val rowHeight = dp(iconSize)
             val ordered = display.reversed()
             ordered.chunked(perRow).forEachIndexed { rowIndex, chunk ->
                 noFade = (rowIndex + 1) * perRow < ordered.size
-                val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; weightSum = perRow.toFloat() }
-                chunk.forEach { row.addView(createAppView(it), LinearLayout.LayoutParams(0, rowHeight, 1f)) }
-                target.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, rowHeight))
+                val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                chunk.forEachIndexed { i, entry ->
+                    row.addView(createAppView(entry), LinearLayout.LayoutParams(colWidths[i], rowHeight))
+                }
+                target.addView(row, LinearLayout.LayoutParams(screenWidth, rowHeight))
             }
             target.setBackgroundColor(Color.argb(store.expandedBackgroundAlpha(), 0, 0, 0))
             noFade = false
             val rows = maxOf(1, (ordered.size + perRow - 1) / perRow)
             val maxRows = maxOf(1, (resources.displayMetrics.heightPixels / 2) / rowHeight)
             val visibleHeight = minOf(rows, maxRows) * rowHeight
-            target.layoutParams = target.layoutParams.apply { height = rows * rowHeight }
+            target.layoutParams = target.layoutParams.apply { width = screenWidth; height = rows * rowHeight }
             resizeOverlay(visibleHeight)
         } else {
             target.setBackgroundColor(Color.TRANSPARENT)
@@ -332,8 +339,23 @@ class OverlayService : AccessibilityService() {
     private class AlphaIconView(context: android.content.Context, private val icon: Drawable?, private val cropSystemIcon: Boolean, private val fadeAmount: Int, private val overallAlpha: Int) : View(context) {
         private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
         private val layerPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private var cached: android.graphics.Bitmap? = null
+
+        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            super.onSizeChanged(w, h, oldw, oldh)
+            if (w != oldw || h != oldh) cached = null
+        }
+
         override fun onDraw(canvas: android.graphics.Canvas) {
             super.onDraw(canvas)
+            if (width <= 0 || height <= 0) return
+            val bitmap = cached ?: renderBitmap().also { cached = it }
+            canvas.drawBitmap(bitmap, 0f, 0f, null)
+        }
+
+        private fun renderBitmap(): android.graphics.Bitmap {
+            val bmp = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+            val bmpCanvas = android.graphics.Canvas(bmp)
             val radius = 12f * resources.displayMetrics.density
             val path = android.graphics.Path().apply { addRoundRect(RectF(0f, 0f, width.toFloat(), height.toFloat()), floatArrayOf(0f, 0f, 0f, 0f, radius, radius, radius, radius), android.graphics.Path.Direction.CW) }
             val boxW = if (cropSystemIcon) width / .80f else width.toFloat()
@@ -346,22 +368,17 @@ class OverlayService : AccessibilityService() {
             val left = (width - drawW) / 2f
             val top = (height - drawH) / 2f
             icon?.setBounds(left.toInt(), top.toInt(), (left + drawW).toInt(), (top + drawH).toInt())
-            if (fadeAmount == 0) {
-                canvas.save()
-                canvas.clipPath(path)
-                icon?.alpha = overallAlpha
-                icon?.draw(canvas)
-                canvas.restore()
-            } else {
-                layerPaint.alpha = overallAlpha
-                canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), layerPaint)
-                canvas.clipPath(path)
-                icon?.alpha = 255
-                icon?.draw(canvas)
+            layerPaint.alpha = overallAlpha
+            bmpCanvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), layerPaint)
+            bmpCanvas.clipPath(path)
+            icon?.alpha = 255
+            icon?.draw(bmpCanvas)
+            if (fadeAmount > 0) {
                 maskPaint.shader = LinearGradient(0f, 0f, 0f, height.toFloat(), Color.WHITE, Color.argb(255 - fadeAmount, 255, 255, 255), Shader.TileMode.CLAMP)
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), maskPaint)
-                canvas.restore()
+                bmpCanvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), maskPaint)
             }
+            bmpCanvas.restore()
+            return bmp
         }
     }
 
