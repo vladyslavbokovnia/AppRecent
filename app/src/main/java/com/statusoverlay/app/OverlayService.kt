@@ -322,14 +322,14 @@ class OverlayService : AccessibilityService() {
     private fun createAppView(entry: AppEntry): View {
         val custom = store.customIcon(entry.packageName)
         val fade = if (noFade) 0 else store.bottomGradientAlpha()
-        return AlphaIconView(this, loadIcon(entry.packageName), custom == null, fade, store.iconAlpha()).apply {
+        return AlphaIconView(this, loadIcon(entry.packageName), custom == null, custom != null && store.stretchCustomIcons(), fade, store.iconAlpha()).apply {
             setOnClickListener { launch(entry) }
             setOnLongClickListener { showMenu(this, entry); true }
             contentDescription = entry.label
         }
     }
 
-    private class AlphaIconView(context: android.content.Context, private val icon: Drawable?, private val cropSystemIcon: Boolean, private val fadeAmount: Int, private val overallAlpha: Int) : View(context) {
+    private class AlphaIconView(context: android.content.Context, private val icon: Drawable?, private val cropSystemIcon: Boolean, private val stretchCustomImage: Boolean, private val fadeAmount: Int, private val overallAlpha: Int) : View(context) {
         private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
         private val layerPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         override fun onDraw(canvas: android.graphics.Canvas) {
@@ -340,12 +340,17 @@ class OverlayService : AccessibilityService() {
             val boxH = height.toFloat()
             val iw = icon?.intrinsicWidth?.takeIf { it > 0 }?.toFloat() ?: boxW
             val ih = icon?.intrinsicHeight?.takeIf { it > 0 }?.toFloat() ?: boxH
-            val scale = if (cropSystemIcon) maxOf(boxW / iw, boxH / ih) else minOf(boxW / iw, boxH / ih)
-            val drawW = iw * scale
-            val drawH = ih * scale
-            val left = (width - drawW) / 2f
-            val top = (height - drawH) / 2f
-            icon?.setBounds(left.toInt(), top.toInt(), (left + drawW).toInt(), (top + drawH).toInt())
+            if (stretchCustomImage) {
+                // Custom replacement images can fill the wide cells in the narrow panel.
+                icon?.setBounds(0, 0, width, height)
+            } else {
+                val scale = if (cropSystemIcon) maxOf(boxW / iw, boxH / ih) else minOf(boxW / iw, boxH / ih)
+                val drawW = iw * scale
+                val drawH = ih * scale
+                val left = (width - drawW) / 2f
+                val top = (height - drawH) / 2f
+                icon?.setBounds(left.toInt(), top.toInt(), (left + drawW).toInt(), (top + drawH).toInt())
+            }
             if (fadeAmount == 0) {
                 canvas.save()
                 canvas.clipPath(path)
