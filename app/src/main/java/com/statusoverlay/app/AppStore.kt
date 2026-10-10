@@ -15,6 +15,8 @@ class AppStore(context: Context) {
     fun setHidden(packageName: String, value: Boolean) { val set = hidden().toMutableSet(); if (value) set += packageName else set -= packageName; hiddenPrefs.edit().putStringSet("hidden_list", set).apply() }
     fun customIcon(packageName: String): String? = iconPrefs.getString(packageName, null)
     fun setCustomIcon(packageName: String, uri: String?) = iconPrefs.edit().apply { if (uri == null) remove(packageName) else putString(packageName, uri) }.apply()
+    fun stretchCustomIcons(): Boolean = prefs.getBoolean("stretch_custom_icons", false)
+    fun setStretchCustomIcons(value: Boolean) = prefs.edit().putBoolean("stretch_custom_icons", value).apply()
     fun renderMode(): RenderMode = runCatching { RenderMode.valueOf(prefs.getString("render_mode", RenderMode.VISIBLE.name)!!) }.getOrDefault(RenderMode.VISIBLE)
     fun setRenderMode(mode: RenderMode) = prefs.edit().putString("render_mode", mode.name).apply()
     fun sortMode(): SortMode = if (prefs.getString("sort_mode", "usage") == "install") SortMode.INSTALL else SortMode.RECENT
